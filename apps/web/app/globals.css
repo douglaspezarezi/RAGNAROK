@@ -355,16 +355,33 @@ body {
   animation: rk-glow 1.8s ease-in-out infinite;
 }
 
+/* revelação simples dos resultados de invocação */
+@keyframes rk-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rk-reveal {
+  animation: rk-reveal 0.35s ease both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .rk-swing,
   .rk-shake,
   .rk-enter,
   .rk-hurt,
   .rk-boss,
-  .rk-floater {
+  .rk-floater,
+  .rk-reveal {
     animation: none !important;
   }
-  .rk-floater {
+  .rk-floater,
+  .rk-reveal {
     opacity: 1;
   }
 }

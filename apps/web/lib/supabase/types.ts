@@ -12,7 +12,12 @@ export interface CharacterProgress {
   rebirthCount: number;
   clearedChapters: number[];
   clearedStageIds: string[];
-  equippedSeals: string[];
+}
+
+/** Contador de pity por banner (`characters.summon_pity`). */
+export interface SummonPity {
+  companion: number;
+  seal: number;
 }
 
 export interface PlayerRow {
@@ -32,6 +37,10 @@ export interface CharacterRow {
   current_stage_id: string;
   base_attributes: Record<string, number>;
   progress: Partial<CharacterProgress>;
+  /** slot de equipamento -> id do Selo equipado */
+  equipped_seals: Record<string, string>;
+  summon_crystals: number;
+  summon_pity: Partial<SummonPity>;
   updated_at: string;
 }
 

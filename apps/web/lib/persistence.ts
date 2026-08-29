@@ -11,7 +11,12 @@
 
 import type { OfflineRewardsSummary } from "@game/core";
 
-import { createInitialCharacter, type GameSave, SAVE_VERSION } from "./gameSave";
+import {
+  createInitialCharacter,
+  INITIAL_SUMMON_CRYSTALS,
+  type GameSave,
+  SAVE_VERSION,
+} from "./gameSave";
 import { getSupabase } from "./supabase/client";
 import type {
   CharacterProgress,
@@ -20,6 +25,8 @@ import type {
   PlayerSealRow,
 } from "./supabase/types";
 import { toast } from "./toast";
+
+const FRESH_PITY = { companion: 0, seal: 0 };
 
 /** Metadados necessários para salvar depois. */
 export interface LoadedBundle {
@@ -50,7 +57,6 @@ function progressOf(row: CharacterRow): CharacterProgress {
     rebirthCount: p.rebirthCount ?? 0,
     clearedChapters: p.clearedChapters ?? [],
     clearedStageIds: p.clearedStageIds ?? [],
-    equippedSeals: p.equippedSeals ?? [],
   };
 }
 
@@ -61,6 +67,8 @@ function rowsToGameSave(
 ): GameSave {
   const progress = progressOf(character);
   const base = character.base_attributes ?? {};
+  const equippedSeals = character.equipped_seals ?? {};
+  const pity = character.summon_pity ?? {};
   return {
     version: SAVE_VERSION,
     character: {
@@ -76,7 +84,7 @@ function rowsToGameSave(
         SOR: base.SOR ?? 0,
       },
       currentStageId: character.current_stage_id,
-      equippedSeals: progress.equippedSeals,
+      equippedSeals: Object.values(equippedSeals),
       rebirthCount: progress.rebirthCount,
       clearedChapters: progress.clearedChapters,
       clearedStageIds: progress.clearedStageIds,
@@ -86,6 +94,9 @@ function rowsToGameSave(
     companionFragments: Object.fromEntries(
       companions.map((c) => [c.companion_id, c.fragments]),
     ),
+    equippedSeals,
+    summonCrystals: Number(character.summon_crystals ?? INITIAL_SUMMON_CRYSTALS),
+    summonPity: { companion: pity.companion ?? 0, seal: pity.seal ?? 0 },
   };
 }
 
@@ -95,7 +106,6 @@ function progressFromSave(save: GameSave): CharacterProgress {
     rebirthCount: c.rebirthCount ?? 0,
     clearedChapters: c.clearedChapters ?? [],
     clearedStageIds: c.clearedStageIds ?? [],
-    equippedSeals: c.equippedSeals ?? [],
   };
 }
 
@@ -110,6 +120,9 @@ function characterColumnsFromSave(save: GameSave): Record<string, unknown> {
     current_stage_id: c.currentStageId,
     base_attributes: c.baseAttributes,
     progress: progressFromSave(save),
+    equipped_seals: save.equippedSeals,
+    summon_crystals: save.summonCrystals,
+    summon_pity: save.summonPity,
     updated_at: new Date().toISOString(),
   };
 }
@@ -180,8 +193,10 @@ async function ensureCharacter(playerId: string): Promise<string | null> {
         rebirthCount: 0,
         clearedChapters: [],
         clearedStageIds: [],
-        equippedSeals: [],
       } satisfies CharacterProgress,
+      equipped_seals: {},
+      summon_crystals: INITIAL_SUMMON_CRYSTALS,
+      summon_pity: FRESH_PITY,
     })
     .select("id")
     .single();
@@ -252,20 +267,22 @@ export async function saveBundle(
   const supabase = getSupabase();
   const nowIso = new Date().toISOString();
 
-  const sealRows = Object.entries(save.sealFragments)
-    .filter(([, amount]) => amount > 0)
-    .map(([seal_id, fragments]) => ({
+  // upsert de todas as chaves: a existência da linha = "o jogador possui o item"
+  // (mesmo com 0 fragmentos, ex.: item novo vindo do gacha).
+  const sealRows = Object.entries(save.sealFragments).map(
+    ([seal_id, fragments]) => ({
       player_id: target.playerId,
       seal_id,
       fragments,
-    }));
-  const companionRows = Object.entries(save.companionFragments)
-    .filter(([, amount]) => amount > 0)
-    .map(([companion_id, fragments]) => ({
+    }),
+  );
+  const companionRows = Object.entries(save.companionFragments).map(
+    ([companion_id, fragments]) => ({
       player_id: target.playerId,
       companion_id,
       fragments,
-    }));
+    }),
+  );
 
   try {
     const results = await Promise.all([
@@ -381,8 +398,10 @@ export async function resetCharacter(target: SaveTarget): Promise<boolean> {
             rebirthCount: 0,
             clearedChapters: [],
             clearedStageIds: [],
-            equippedSeals: [],
           } satisfies CharacterProgress,
+          equipped_seals: {},
+          summon_crystals: INITIAL_SUMMON_CRYSTALS,
+          summon_pity: FRESH_PITY,
           updated_at: new Date().toISOString(),
         })
         .eq("id", target.characterId),

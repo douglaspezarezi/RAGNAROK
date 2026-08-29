@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CHAPTERS, JOBS_BY_ID, MONSTERS_BY_ID } from "@game/data";
 import {
   calculateDerivedStats,
+  canRebirth,
   deriveMonsterStats,
+  getRebirthMultiplier,
   resolveMonsterDefeat,
   simulateCombatTick,
 } from "@game/core";
@@ -22,6 +24,7 @@ import {
 import { heroSprite, monsterSprite } from "@/lib/sprites";
 import { BattleArena, type Floater } from "./BattleArena";
 import { CombatLog, type LogEntry } from "./CombatLog";
+import { RebirthModal } from "./RebirthModal";
 import { StatusPanel } from "./StatusPanel";
 
 const TICK_MS = 1000;
@@ -38,8 +41,9 @@ function chapterName(chapterNumber: number): string {
   );
 }
 
-export function Game({ accountBar }: { accountBar?: ReactNode } = {}) {
+export function Game() {
   const [mounted, setMounted] = useState(false);
+  const [rebirthOpen, setRebirthOpen] = useState(false);
   const save = useGameSave();
   const character = save.character;
 
@@ -227,6 +231,8 @@ export function Game({ accountBar }: { accountBar?: ReactNode } = {}) {
   );
   const hasNextChapter = getStageMonsters(currentChapter + 1).length > 0;
   const clearedStageCount = character.clearedStageIds?.length ?? 0;
+  const rebirthAvailable = canRebirth(character);
+  const rebirthMult = getRebirthMultiplier(character);
 
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
@@ -234,8 +240,22 @@ export function Game({ accountBar }: { accountBar?: ReactNode } = {}) {
         <h1 className="text-xl font-bold">
           RAGNAROK{" "}
           <span className="font-normal text-neutral-400">— protótipo</span>
+          {rebirthMult > 1 ? (
+            <span className="ml-2 text-xs font-normal text-amber-500">
+              ×{rebirthMult.toFixed(2)} (renascimento)
+            </span>
+          ) : null}
         </h1>
         <div className="flex items-center gap-2">
+          {rebirthAvailable ? (
+            <button
+              type="button"
+              onClick={() => setRebirthOpen(true)}
+              className="rounded border border-amber-500 px-3 py-1 text-sm font-medium text-amber-600 dark:text-amber-400"
+            >
+              ✦ Renascer
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setPaused((p) => !p)}
@@ -243,7 +263,6 @@ export function Game({ accountBar }: { accountBar?: ReactNode } = {}) {
           >
             {paused ? "▶ Continuar" : "⏸ Pausar"}
           </button>
-          {accountBar}
         </div>
       </header>
 
@@ -309,6 +328,13 @@ export function Game({ accountBar }: { accountBar?: ReactNode } = {}) {
           reset
         </button>
       </footer>
+
+      {rebirthOpen ? (
+        <RebirthModal
+          character={character}
+          onClose={() => setRebirthOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }

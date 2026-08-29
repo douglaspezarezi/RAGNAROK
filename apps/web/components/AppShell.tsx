@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import type { OfflineRewardsSummary } from "@game/core";
 
@@ -14,17 +16,23 @@ import {
   setBackgrounded,
   startAutosave,
   stopAutosave,
+  useIsSaving,
 } from "@/lib/gameStore";
 import { loadBundle, touchLastSeenBeacon } from "@/lib/persistence";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { Toaster } from "@/lib/toast";
 import { AuthScreen } from "./AuthScreen";
-import { Game } from "./Game";
 import { OfflineRewardsModal } from "./OfflineRewardsModal";
 
 type Phase = "loading" | "config" | "auth" | "ready" | "error";
 
-export function AppShell() {
+const NAV = [
+  { href: "/", label: "Combate" },
+  { href: "/equipment", label: "Equipar" },
+  { href: "/summon", label: "Invocar" },
+] as const;
+
+export function AppShell({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [email, setEmail] = useState<string | null>(null);
   const [offline, setOffline] = useState<OfflineRewardsSummary | null>(null);
@@ -69,7 +77,6 @@ export function AppShell() {
       if (cancelled) return;
       if (session?.user) {
         const { id, email: mail } = session.user;
-        // adiado para evitar reentrância dentro do callback do supabase-js
         setTimeout(() => void enterWithUser(id, mail ?? null), 0);
       } else if (event === "SIGNED_OUT" || !session) {
         loadedUserId.current = null;
@@ -103,10 +110,9 @@ export function AppShell() {
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
         setBackgrounded(true);
-        void saveNow(); // registra last_seen_at = agora
+        void saveNow();
       } else {
         setBackgrounded(false);
-        // espera o save do "hidden" assentar antes de medir o tempo fora
         void flushSaves()
           .then(() => checkOfflineProgress())
           .then((s) => {
@@ -138,58 +144,95 @@ export function AppShell() {
     await getSupabase().auth.signOut();
   }
 
+  if (phase === "loading") {
+    return <main className="p-6 text-sm text-neutral-400">Carregando…</main>;
+  }
+  if (phase === "config") return <ConfigMissing />;
+  if (phase === "error") {
+    return (
+      <main className="mx-auto max-w-md p-6 text-sm">
+        <p className="text-red-500">Não foi possível carregar seu progresso.</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-3 rounded border border-neutral-300 px-3 py-1 dark:border-neutral-700"
+        >
+          Tentar de novo
+        </button>
+        <Toaster />
+      </main>
+    );
+  }
+  if (phase === "auth") {
+    return (
+      <>
+        <AuthScreen />
+        <Toaster />
+      </>
+    );
+  }
+
+  // phase === "ready"
   return (
     <>
-      {phase === "loading" ? (
-        <main className="p-6 text-sm text-neutral-400">Carregando…</main>
+      <TopBar email={email} onSignOut={() => void signOut()} />
+      <div className="flex-1">{children}</div>
+      {offline ? (
+        <OfflineRewardsModal
+          summary={offline}
+          onClose={() => setOffline(null)}
+        />
       ) : null}
-
-      {phase === "config" ? <ConfigMissing /> : null}
-
-      {phase === "error" ? (
-        <main className="mx-auto max-w-md p-6 text-sm">
-          <p className="text-red-500">
-            Não foi possível carregar seu progresso.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="mt-3 rounded border border-neutral-300 px-3 py-1 dark:border-neutral-700"
-          >
-            Tentar de novo
-          </button>
-        </main>
-      ) : null}
-
-      {phase === "auth" ? <AuthScreen /> : null}
-
-      {phase === "ready" ? (
-        <>
-          <Game
-            accountBar={
-              <div className="flex items-center gap-2 text-xs text-neutral-500">
-                <span className="max-w-[160px] truncate">{email}</span>
-                <button
-                  type="button"
-                  onClick={() => void signOut()}
-                  className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700"
-                >
-                  Sair
-                </button>
-              </div>
-            }
-          />
-          {offline ? (
-            <OfflineRewardsModal
-              summary={offline}
-              onClose={() => setOffline(null)}
-            />
-          ) : null}
-        </>
-      ) : null}
-
       <Toaster />
     </>
+  );
+}
+
+function TopBar({
+  email,
+  onSignOut,
+}: {
+  email: string | null;
+  onSignOut: () => void;
+}) {
+  const pathname = usePathname();
+  const saving = useIsSaving();
+
+  return (
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-200 px-4 py-2 dark:border-neutral-800">
+      <nav className="flex gap-1 text-sm">
+        {NAV.map((item) => {
+          const active =
+            item.href === "/"
+              ? pathname === "/"
+              : pathname.startsWith(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`rounded px-2 py-1 ${
+                active
+                  ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900"
+                  : "text-neutral-500 hover:text-[color:inherit]"
+              }`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="flex items-center gap-2 text-xs text-neutral-500">
+        <span className={saving ? "opacity-100" : "opacity-0"}>💾 salvando…</span>
+        <span className="max-w-[160px] truncate">{email}</span>
+        <button
+          type="button"
+          onClick={onSignOut}
+          className="rounded border border-neutral-300 px-2 py-1 dark:border-neutral-700"
+        >
+          Sair
+        </button>
+      </div>
+    </header>
   );
 }
 

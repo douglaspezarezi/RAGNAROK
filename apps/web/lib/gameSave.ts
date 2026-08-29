@@ -9,23 +9,42 @@
 
 import { BASE_JOBS, MONSTERS, type Monster } from "@game/data";
 import {
+  applyRebirth,
+  canRebirth,
   getMonstersByChapter,
+  type BannerType,
   type CharacterState,
   type DefeatRewards,
   type OfflineRewardsSummary,
+  type SummonResult,
 } from "@game/core";
 
 export const SAVE_VERSION = 1;
+
+/** Banners de invocação (chave em `summonPity`). */
+export type SummonBanner = BannerType;
 
 export interface GameSave {
   version: number;
   character: CharacterState;
   gold: number;
-  /** sealId -> quantidade de fragmentos */
+  /** sealId -> fragmentos/essência acumulados (a existência da chave = "possui o Selo") */
   sealFragments: Record<string, number>;
-  /** companionId -> quantidade de fragmentos */
+  /** companionId -> fragmentos acumulados (a existência da chave = "possui o Companheiro") */
   companionFragments: Record<string, number>;
+  /** slot de equipamento (EquipmentSlot) -> id do Selo equipado */
+  equippedSeals: Record<string, string>;
+  /** saldo de Cristal de Invocação */
+  summonCrystals: number;
+  /** contador de pity por banner */
+  summonPity: Record<SummonBanner, number>;
 }
+
+/** Saldo inicial de Cristal de Invocação (placeholder — sem fonte de renda ainda). */
+export const INITIAL_SUMMON_CRYSTALS = 1000;
+
+/** Custo em Cristais por invocação. */
+export const SUMMON_COST = { single: 100, ten: 900 } as const;
 
 /* -------------------------------------------------------------------------- */
 /*  Estado inicial (mesma lógica de antes, agora reaproveitada no onboarding)  */
@@ -78,6 +97,9 @@ export function createInitialSave(): GameSave {
     gold: 0,
     sealFragments: {},
     companionFragments: {},
+    equippedSeals: {},
+    summonCrystals: INITIAL_SUMMON_CRYSTALS,
+    summonPity: { companion: 0, seal: 0 },
   };
 }
 
@@ -240,6 +262,116 @@ export function applyAdvanceStage(
     ok: true,
     toChapter: fromChapter + 1,
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Equipar Selos                                                              */
+/* -------------------------------------------------------------------------- */
+
+/** Mantém `character.equippedSeals` (array, usado por `calculateDerivedStats`)
+ *  em sincronia com o mapa por slot. */
+function withEquippedInSync(
+  save: GameSave,
+  equipped: Record<string, string>,
+): GameSave {
+  return {
+    ...save,
+    equippedSeals: equipped,
+    character: { ...save.character, equippedSeals: Object.values(equipped) },
+  };
+}
+
+/** Equipa `sealId` no `slot` (um Selo por slot; remove o mesmo Selo de outro slot). */
+export function applyEquip(
+  save: GameSave,
+  slot: string,
+  sealId: string,
+): GameSave {
+  const equipped: Record<string, string> = {};
+  for (const [s, id] of Object.entries(save.equippedSeals)) {
+    if (id !== sealId) equipped[s] = id; // tira o Selo de onde estivesse
+  }
+  equipped[slot] = sealId;
+  return withEquippedInSync(save, equipped);
+}
+
+/** Desequipa o Selo do `slot`. */
+export function applyUnequip(save: GameSave, slot: string): GameSave {
+  if (!save.equippedSeals[slot]) return save;
+  const equipped = { ...save.equippedSeals };
+  delete equipped[slot];
+  return withEquippedInSync(save, equipped);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Invocação (gacha)                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface ApplySummonInput {
+  crystalCost: number;
+  /** pity final após a leva (vem do último `SummonResult.pityCounterAfter`). */
+  finalPity: number;
+  results: SummonResult[];
+}
+
+/**
+ * Aplica uma leva de invocações ao save: debita Cristais, grava o pity final e
+ * concede posse (novo) ou fragmentos/Essência (duplicata). Não muta `save`.
+ */
+export function applySummonResults(
+  save: GameSave,
+  banner: SummonBanner,
+  { crystalCost, finalPity, results }: ApplySummonInput,
+): GameSave {
+  const map = {
+    ...(banner === "companion" ? save.companionFragments : save.sealFragments),
+  };
+  for (const r of results) {
+    if (r.outcome === "new") {
+      map[r.itemId] = map[r.itemId] ?? 0; // garante a linha de posse
+    } else {
+      map[r.itemId] = (map[r.itemId] ?? 0) + r.fragmentsAwarded;
+    }
+  }
+  return {
+    ...save,
+    summonCrystals: Math.max(0, save.summonCrystals - crystalCost),
+    summonPity: { ...save.summonPity, [banner]: finalPity },
+    ...(banner === "companion"
+      ? { companionFragments: map }
+      : { sealFragments: map }),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Rebirth                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Aplica `applyRebirth` de `@game/core` ao personagem, preservando o resto do
+ * save (Selos equipados, Cristais, pity, fragmentos). Não muta `save`.
+ */
+export function applyRebirthToSave(save: GameSave): {
+  ok: boolean;
+  save: GameSave;
+  error?: string;
+} {
+  if (!canRebirth(save.character)) {
+    return {
+      ok: false,
+      save,
+      error: "O personagem ainda não atende ao gatilho de renascimento.",
+    };
+  }
+  try {
+    return { ok: true, save: { ...save, character: applyRebirth(save.character) } };
+  } catch (e) {
+    return {
+      ok: false,
+      save,
+      error: e instanceof Error ? e.message : "Erro ao renascer.",
+    };
+  }
 }
 
 /** Aplica o resumo de progresso offline (`@game/core`) ao save. Não muta. */

@@ -21,14 +21,22 @@ import { useSyncExternalStore } from "react";
 import { MONSTERS_BY_ID } from "@game/data";
 import {
   calculateOfflineRewards,
+  rollSummon,
+  type BannerType,
   type OfflineRewardsSummary,
+  type SummonResult,
 } from "@game/core";
 
 import {
   applyAdvanceStage,
+  applyEquip,
   applyKill,
   applyOfflineRewards,
+  applyRebirthToSave,
+  applySummonResults,
+  applyUnequip,
   createInitialSave,
+  SUMMON_COST,
   type ApplyKillInput,
   type GameSave,
 } from "./gameSave";
@@ -43,7 +51,9 @@ import {
 export {
   createInitialSave,
   getStageMonsters,
+  INITIAL_SUMMON_CRYSTALS,
   LEVEL_UP_ATTRIBUTE_GROWTH,
+  SUMMON_COST,
   xpToNextLevel,
   type GameSave,
 } from "./gameSave";
@@ -70,6 +80,7 @@ let clientState: GameSave | null = null;
 let meta: StoreMeta | null = null;
 let dirty = false;
 let backgrounded = false;
+let savingCount = 0;
 let autosaveTimer: ReturnType<typeof setInterval> | null = null;
 /** Serializa os saves — nunca dois em paralelo, nenhum save perdido. */
 let saveChain: Promise<void> = Promise.resolve();
@@ -161,26 +172,34 @@ export function stopAutosave(): void {
 /*  Save                                                                       */
 /* -------------------------------------------------------------------------- */
 
-async function doSave(): Promise<void> {
-  if (!clientState || !meta) return;
+async function doSave(): Promise<boolean> {
+  if (!clientState || !meta) return true;
 
-  if (!dirty) {
-    // nada mudou -> só marca presença
-    await touchLastSeen(meta.playerId);
-    meta.lastSeenAtMs = Date.now();
-    return;
-  }
+  savingCount += 1;
+  emit();
+  try {
+    if (!dirty) {
+      // nada mudou -> só marca presença
+      await touchLastSeen(meta.playerId);
+      meta.lastSeenAtMs = Date.now();
+      return true;
+    }
 
-  const snapshot = clientState;
-  const ok = await saveBundle(
-    { playerId: meta.playerId, characterId: meta.characterId },
-    snapshot,
-  );
-  if (ok) {
-    meta.lastSeenAtMs = Date.now();
-    if (clientState === snapshot) dirty = false; // nada mudou durante o save
+    const snapshot = clientState;
+    const ok = await saveBundle(
+      { playerId: meta.playerId, characterId: meta.characterId },
+      snapshot,
+    );
+    if (ok) {
+      meta.lastSeenAtMs = Date.now();
+      if (clientState === snapshot) dirty = false; // nada mudou durante o save
+    }
+    // em falha, `dirty` continua true e o próximo save tenta de novo
+    return ok;
+  } finally {
+    savingCount -= 1;
+    emit();
   }
-  // em falha, `dirty` continua true e o próximo save tenta de novo
 }
 
 /**
@@ -189,13 +208,32 @@ async function doSave(): Promise<void> {
  * Sem-op se nada mudou (`dirty === false`) ou se não hidratado.
  */
 export function saveNow(): Promise<void> {
-  saveChain = saveChain.catch(() => {}).then(doSave);
+  saveChain = saveChain
+    .catch(() => {})
+    .then(() => doSave().then(() => undefined));
   return saveChain;
 }
 
 /** Aguarda todos os saves enfileirados terminarem. */
 export function flushSaves(): Promise<void> {
   return saveChain.catch(() => {});
+}
+
+/**
+ * Salva AGORA e devolve se deu certo — para ações com consequência (invocar,
+ * renascer) que precisam confirmar a persistência antes de dar como concluídas.
+ */
+async function persistNowChecked(): Promise<boolean> {
+  await flushSaves();
+  return doSave();
+}
+
+export function useIsSaving(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => savingCount > 0,
+    () => false,
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -301,4 +339,104 @@ export async function resetSave(): Promise<void> {
   });
   meta.lastSeenAtMs = Date.now();
   dirty = false;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Equipar Selos                                                              */
+/* -------------------------------------------------------------------------- */
+
+export function equipSeal(slot: string, sealId: string): void {
+  if (!clientState) return;
+  commit(applyEquip(clientState, slot, sealId));
+  void saveNow();
+}
+
+export function unequipSlot(slot: string): void {
+  if (!clientState) return;
+  commit(applyUnequip(clientState, slot));
+  void saveNow();
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Invocação (gacha)                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface SummonOutcome {
+  ok: boolean;
+  results?: SummonResult[];
+  error?: string;
+}
+
+/**
+ * Executa `count` invocações num banner: valida saldo, chama `rollSummon` de
+ * `@game/core` (pity encadeado entre as rolls, duplicatas viram fragmentos),
+ * aplica ao save e PERSISTE antes de devolver `ok: true`. Faz rollback do estado
+ * em memória se o save falhar (o jogador não perde Cristais em silêncio).
+ */
+export async function performSummon(
+  banner: BannerType,
+  count: 1 | 10,
+): Promise<SummonOutcome> {
+  if (!clientState) return { ok: false, error: "Progresso ainda não carregado." };
+
+  const cost = count === 10 ? SUMMON_COST.ten : SUMMON_COST.single;
+  if (clientState.summonCrystals < cost) {
+    return { ok: false, error: "Cristais de Invocação insuficientes." };
+  }
+
+  const ownedMap =
+    banner === "companion"
+      ? clientState.companionFragments
+      : clientState.sealFragments;
+  const owned = new Set(Object.keys(ownedMap));
+
+  let pity = clientState.summonPity[banner] ?? 0;
+  const results: SummonResult[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const r = rollSummon(banner, pity, Math.random, { ownedIds: owned });
+    pity = r.pityCounterAfter;
+    results.push(r);
+    if (r.outcome === "new") owned.add(r.itemId); // repetido na mesma leva = duplicata
+  }
+
+  const prev = clientState;
+  commit(
+    applySummonResults(prev, banner, {
+      crystalCost: cost,
+      finalPity: pity,
+      results,
+    }),
+  );
+
+  const saved = await persistNowChecked();
+  if (!saved) {
+    commit(prev); // rollback — o toast de erro já apareceu
+    return { ok: false, error: "Falha ao salvar a invocação. Tente de novo." };
+  }
+  return { ok: true, results };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Rebirth                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Aplica o renascimento (`applyRebirth` de `@game/core`) e persiste. Rollback
+ * em memória se o save falhar.
+ */
+export async function doRebirth(): Promise<{ ok: boolean; error?: string }> {
+  if (!clientState) return { ok: false, error: "Progresso ainda não carregado." };
+
+  const res = applyRebirthToSave(clientState);
+  if (!res.ok) return { ok: false, error: res.error };
+
+  const prev = clientState;
+  commit(res.save);
+
+  const saved = await persistNowChecked();
+  if (!saved) {
+    commit(prev);
+    return { ok: false, error: "Falha ao salvar o renascimento. Tente de novo." };
+  }
+  return { ok: true };
 }
