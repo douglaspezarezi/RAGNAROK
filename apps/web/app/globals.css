@@ -24,3 +24,347 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ======================================================================
+   Cena de batalha (protótipo)
+   ====================================================================== */
+
+.rk-arena {
+  position: relative;
+  height: clamp(240px, 34vw, 300px);
+  border-radius: 16px;
+  overflow: hidden;
+  color: #e5e7eb;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  user-select: none;
+}
+
+.rk-chapter {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.75);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+}
+
+.rk-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 80px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(0, 0, 0, 0.28)
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rk-slot {
+  position: absolute;
+  bottom: 42px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: min(190px, 40vw);
+}
+.rk-slot-hero {
+  left: 5%;
+}
+.rk-slot-monster {
+  right: 5%;
+}
+
+.rk-sprite-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.rk-sprite {
+  font-size: clamp(48px, 12vw, 88px);
+  line-height: 1;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5));
+}
+.rk-slot-hero .rk-sprite {
+  transform: scaleX(-1); /* herói "olhando" para o monstro */
+}
+.rk-slot-hero .rk-sprite span {
+  display: inline-block;
+}
+
+.rk-shadow {
+  width: 68px;
+  height: 12px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  filter: blur(2px);
+}
+
+.rk-aura {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -55%);
+  pointer-events: none;
+}
+
+.rk-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+.rk-name .rk-sub {
+  font-weight: 400;
+  opacity: 0.7;
+}
+.rk-tags {
+  font-size: 10px;
+  opacity: 0.65;
+  text-align: center;
+}
+.rk-badge {
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.16);
+}
+
+/* faixa inferior: XP + ouro */
+.rk-strip {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.rk-strip-label {
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+}
+.rk-xpbar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+.rk-xpbar > div {
+  height: 100%;
+  background: #a855f7;
+  transition: width 0.3s;
+}
+.rk-strip-gold {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.rk-arena-paused {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  font-size: 14px;
+  background: rgba(2, 6, 23, 0.55);
+}
+
+/* ---- números flutuantes ---- */
+.rk-floaters {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  overflow: hidden;
+}
+.rk-floater {
+  position: absolute;
+  font-weight: 800;
+  font-size: 18px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+  animation: rk-floatUp 0.95s ease-out forwards;
+}
+.rk-floater-monster {
+  right: 24%;
+  top: 46%;
+}
+.rk-floater-hero {
+  left: 18%;
+  top: 52%;
+}
+.rk-floater-dmg {
+  color: #fde047;
+}
+.rk-floater-taken {
+  color: #fca5a5;
+  font-size: 15px;
+}
+.rk-floater-info {
+  color: #7dd3fc;
+  font-size: 13px;
+  top: 30%;
+}
+.rk-floater-level {
+  color: #fbbf24;
+  font-size: 20px;
+  top: 26%;
+}
+.rk-floater-defeat {
+  font-size: 28px;
+  top: 38%;
+}
+
+/* ---- keyframes ---- */
+@keyframes rk-floatUp {
+  0% {
+    opacity: 0;
+    transform: translate(var(--dx, 0), 6px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(var(--dx, 0), -4px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx, 0), -54px) scale(1);
+  }
+}
+@keyframes rk-swing {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(22px) rotate(-6deg);
+  }
+  55% {
+    transform: translateX(12px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+.rk-swing {
+  animation: rk-swing 0.45s ease;
+}
+/* o herói está espelhado; o swing precisa empurrar para o lado do monstro */
+.rk-slot-hero .rk-swing {
+  animation-name: rk-swing-hero;
+}
+@keyframes rk-swing-hero {
+  0% {
+    transform: scaleX(-1) translateX(0);
+  }
+  30% {
+    transform: scaleX(-1) translateX(22px) rotate(6deg);
+  }
+  55% {
+    transform: scaleX(-1) translateX(12px);
+  }
+  100% {
+    transform: scaleX(-1) translateX(0);
+  }
+}
+@keyframes rk-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-7px);
+  }
+  30% {
+    transform: translateX(6px);
+  }
+  45% {
+    transform: translateX(-5px);
+  }
+  60% {
+    transform: translateX(4px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+}
+.rk-shake {
+  animation: rk-shake 0.3s ease;
+}
+@keyframes rk-enter {
+  0% {
+    opacity: 0;
+    transform: translateX(52px) scale(0.5);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-6px) scale(1.06);
+  }
+  100% {
+    transform: translateX(0) scale(1);
+  }
+}
+.rk-enter {
+  animation: rk-enter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes rk-hurt {
+  0%,
+  100% {
+    filter: none;
+  }
+  30% {
+    filter: brightness(1.5) sepia(1) saturate(6) hue-rotate(-35deg);
+  }
+}
+.rk-hurt {
+  animation: rk-hurt 0.3s ease;
+}
+@keyframes rk-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5))
+      drop-shadow(0 0 2px rgba(251, 191, 36, 0.5));
+  }
+  50% {
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5))
+      drop-shadow(0 0 16px rgba(251, 191, 36, 0.95));
+  }
+}
+.rk-boss {
+  animation: rk-glow 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rk-swing,
+  .rk-shake,
+  .rk-enter,
+  .rk-hurt,
+  .rk-boss,
+  .rk-floater {
+    animation: none !important;
+  }
+  .rk-floater {
+    opacity: 1;
+  }
+}

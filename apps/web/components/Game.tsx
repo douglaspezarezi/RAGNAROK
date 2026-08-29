@@ -19,13 +19,15 @@ import {
   useGameSave,
   xpToNextLevel,
 } from "@/lib/gameStore";
-import { CharacterPanel } from "./CharacterPanel";
+import { heroSprite, monsterSprite } from "@/lib/sprites";
+import { BattleArena, type Floater } from "./BattleArena";
 import { CombatLog, type LogEntry } from "./CombatLog";
-import { MonsterPanel } from "./MonsterPanel";
 import { StatusPanel } from "./StatusPanel";
 
 const TICK_MS = 1000;
 const MAX_LOG = 40;
+const MAX_FLOATERS = 14;
+const FLOATER_LIFETIME_MS = 950;
 
 const FALLBACK_MONSTER = MONSTERS_BY_ID.get("gotinha")!;
 
@@ -56,12 +58,28 @@ export function Game() {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [paused, setPaused] = useState(false);
 
+  // efeitos visuais da cena de batalha
+  const [fx, setFx] = useState({ n: 0, heroHurt: false, monsterHit: false });
+  const [floaters, setFloaters] = useState<Floater[]>([]);
+  const floaterSeq = useRef(0);
+
   const logIdRef = useRef(0);
   const addLog = useRef((text: string) => {
     setEntries((prev) =>
       [{ id: logIdRef.current++, text }, ...prev].slice(0, MAX_LOG),
     );
   }).current;
+
+  const pushFloater = useRef(
+    (side: Floater["side"], kind: Floater["kind"], text: string) => {
+      const id = floaterSeq.current++;
+      const dx = Math.round((Math.random() - 0.5) * 44);
+      setFloaters((prev) => [...prev, { id, side, kind, text, dx }].slice(-MAX_FLOATERS));
+      window.setTimeout(() => {
+        setFloaters((prev) => prev.filter((f) => f.id !== id));
+      }, FLOATER_LIFETIME_MS);
+    },
+  ).current;
 
   // marca como montado (evita mismatch de hidratação com o localStorage)
   useEffect(() => setMounted(true), []);
@@ -101,11 +119,20 @@ export function Game() {
 
     const dealt = Math.max(0, Math.round(result.damageDealt));
     const taken = Math.max(0, Math.round(result.damageTaken));
+
     addLog(
       taken > 0
         ? `Você causou ${dealt} de dano em ${activeMonster.name} · sofreu ${taken}`
         : `Você causou ${dealt} de dano em ${activeMonster.name}`,
     );
+
+    setFx((prev) => ({
+      n: prev.n + 1,
+      heroHurt: taken > 0,
+      monsterHit: dealt > 0,
+    }));
+    if (dealt > 0) pushFloater("monster", "dmg", `-${dealt}`);
+    if (taken > 0) pushFloater("hero", "taken", `-${taken}`);
 
     setCurrentSp((sp) => Math.min(derived.maxSp, sp + regenSp));
 
@@ -117,6 +144,7 @@ export function Game() {
       addLog(
         `💀 Você foi derrotado por ${activeMonster.name}. Revivido com HP cheio.`,
       );
+      pushFloater("hero", "info", "revivido");
       setCurrentHp(derived.maxHp);
       setMonsterHp(deriveMonsterStats(activeMonster).maxHp);
       return;
@@ -148,18 +176,24 @@ export function Game() {
     addLog(
       `☠️ ${activeMonster.name} derrotado! +${rewards.xp} XP, +${rewards.gold} Ouro`,
     );
+    pushFloater("monster", "defeat", "💥");
+    pushFloater("monster", "info", `+${rewards.xp} XP`);
+
     if (sealDropped && rewards.sealFragment) {
       addLog(`✨ Fragmento de Selo obtido (${rewards.sealFragment.sealId})`);
+      pushFloater("monster", "info", "✨ Selo!");
     }
     if (companionDropped && rewards.companionFragment) {
       addLog(
         `🐾 Fragmento de Companheiro obtido (${rewards.companionFragment.companionId})`,
       );
+      pushFloater("monster", "info", "🐾 Frag!");
     }
     if (levelsGained > 0) {
       addLog(
         `⬆️ Subiu ${levelsGained > 1 ? `${levelsGained} níveis` : "de nível"}! Agora nível ${character.level + levelsGained}. HP restaurado.`,
       );
+      pushFloater("hero", "level", "LEVEL UP!");
     }
     if (chapterCleared) {
       addLog(
@@ -167,7 +201,7 @@ export function Game() {
       );
     }
 
-    // cura cheia ao vencer + reinicia HP do próximo monstro (com stats já atualizados)
+    // cura cheia ao vencer + reinicia HP do próximo monstro (stats já atualizados)
     const fresh = getSave().character;
     setCurrentHp(calculateDerivedStats(fresh).maxHp);
     const nextMonster = MONSTERS_BY_ID.get(fresh.currentStageId);
@@ -209,26 +243,30 @@ export function Game() {
         </button>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <CharacterPanel
-          jobName={job?.name ?? character.jobId}
-          jobLine={job?.line}
-          level={character.level}
-          xp={character.xp ?? 0}
-          xpToNext={xpToNextLevel(character.level)}
-          currentHp={currentHp}
-          maxHp={derived.maxHp}
-          currentSp={currentSp}
-          maxSp={derived.maxSp}
-          gold={save.gold}
-        />
-        <MonsterPanel
-          monster={monster}
-          chapterName={chapterName(currentChapter)}
-          currentHp={monsterHp}
-          maxHp={monsterStats.maxHp}
-        />
-      </div>
+      <BattleArena
+        chapterNumber={currentChapter}
+        chapterLabel={chapterName(currentChapter)}
+        heroEmoji={heroSprite(job?.line)}
+        heroName={job?.name ?? character.jobId}
+        heroLine={job?.line}
+        heroLevel={character.level}
+        heroHp={currentHp}
+        heroMaxHp={derived.maxHp}
+        heroSp={currentSp}
+        heroMaxSp={derived.maxSp}
+        xp={character.xp ?? 0}
+        xpMax={xpToNextLevel(character.level)}
+        gold={save.gold}
+        monster={monster}
+        monsterEmoji={monsterSprite(monster)}
+        monsterHp={monsterHp}
+        monsterMaxHp={monsterStats.maxHp}
+        fxTick={fx.n}
+        heroHurt={fx.heroHurt}
+        monsterHit={fx.monsterHit}
+        floaters={floaters}
+        paused={paused}
+      />
 
       <div className="grid gap-4 md:grid-cols-2">
         <CombatLog entries={entries} />
