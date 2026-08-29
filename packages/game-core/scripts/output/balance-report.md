@@ -1,14 +1,14 @@
 # Relatório de balanceamento — RAGNAROK
 
-Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
+Gerado em 2026-08-29T17:38:15.424Z · `npm run simulate` (packages/game-core)
 
 > Combate/recompensas/offline/gacha vêm de **@game/core** (inalterados). Curva de XP, ganho de atributo por nível e builds por classe são **premissas do harness** (marcadas abaixo).
 
 ## Leitura rápida (observações, não recomendações)
 
-- **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 56m–6h 9m** de jogo simulado, terminando entre **Nv 49 e Nv 72**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
-- **Dispersão entre classes: 3.2×** (mais rápida `Guerreiro` 1h 56m · mais lenta `Acólito` 6h 9m). Builds físicas puras (FOR) são as mais rápidas; builds baseadas em DES/INT/VIT rendem menos dano por ponto neste modelo. Nenhuma classe travou numa parede.
-- **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **11× a 31×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **30–43** no total.
+- **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 51m–5h 43m** de jogo simulado, terminando entre **Nv 49 e Nv 70**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
+- **Dispersão entre classes: 3.1×** (mais rápida `Guerreiro` 1h 51m · mais lenta `Acólito` 5h 43m). Builds concentradas em dano (FOR ou DES) são as mais rápidas; builds que pulverizam pontos em VIT/INT (Acólito, Mercador) demoram mais porque parte do investimento não vira dano. Nenhuma classe travou numa parede.
+- **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **11× a 34×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **27–37** no total.
 - **Offline rende 70% do jogo ativo em média** (faixa 70–70%), alvo `OFFLINE_EFFICIENCY_FACTOR` = **70%**. Calibrado: o offline deriva kills/h do DPS real do personagem, então a razão fica ≈ 70% em qualquer estágio (antes usava taxa fixa `f(nível)` e variava de ~60% a ~125%).
 - **Gacha saudável.** Distribuição por tier a ≤ **0.64 p.p.** do nominal; pity respeitado (gap máximo entre Tier S = **61**, teto teórico 61). Poucos S vêm da garantia de pity — a maioria sai no sorteio.
 
@@ -19,7 +19,7 @@ Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
 | Fonte | Constante | Valor |
 | --- | --- | --- |
 | character.ts | BASE_HP / HP_PER_LEVEL / HP_PER_VIT | 40 / 12 / 15 |
-| character.ts | ATK_PER_FOR / ATK_PER_DES / ATK_PER_LEVEL | 2 / 0.5 / 1 |
+| character.ts | ATK_PER_FOR / ATK_PER_DES / ATK_PER_LEVEL | 2 / 1.2 / 1 |
 | character.ts | MATK_PER_INT / MATK_PER_DES / MATK_PER_LEVEL | 2 / 0.3 / 1 |
 | character.ts | DEF_PER_VIT / DEF_PER_LEVEL | 0.7 / 0.5 |
 | character.ts | CRIT_PER_SOR | 0.3 |
@@ -71,14 +71,14 @@ Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
 
 | Classe | Nível final | Caps. concluídos | Tempo simulado total | Mortes | Parada |
 | --- | --- | --- | --- | --- | --- |
-| Guerreiro | 49 | 10 / 10 | 1h 56m | 34 | concluiu os 10 capítulos |
-| Arcanista | 58 | 10 / 10 | 2h 24m | 30 | concluiu os 10 capítulos |
-| Caçador | 72 | 10 / 10 | 3h 50m | 43 | concluiu os 10 capítulos |
-| Infiltrador | 71 | 10 / 10 | 3h 49m | 43 | concluiu os 10 capítulos |
+| Guerreiro | 49 | 10 / 10 | 1h 51m | 27 | concluiu os 10 capítulos |
+| Arcanista | 58 | 10 / 10 | 2h 23m | 30 | concluiu os 10 capítulos |
+| Caçador | 63 | 10 / 10 | 2h 9m | 34 | concluiu os 10 capítulos |
+| Infiltrador | 70 | 10 / 10 | 3h 35m | 37 | concluiu os 10 capítulos |
 | Mercador | 53 | 10 / 10 | 2h 50m | 32 | concluiu os 10 capítulos |
-| Acólito | 64 | 10 / 10 | 6h 9m | 36 | concluiu os 10 capítulos |
+| Acólito | 63 | 10 / 10 | 5h 43m | 32 | concluiu os 10 capítulos |
 
-**Dispersão entre classes:** mais rápida = `Guerreiro` (1h 56m), mais lenta = `Acólito` (6h 9m) → **3.2×**. Um fator próximo de 1× indica classes parelhas; acima de ~2× já é candidato a ajuste.
+**Dispersão entre classes:** mais rápida = `Guerreiro` (1h 51m), mais lenta = `Acólito` (5h 43m) → **3.1×**. Um fator próximo de 1× indica classes parelhas; acima de ~2× já é candidato a ajuste.
 
 ### Detalhe por capítulo
 
@@ -86,22 +86,22 @@ Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 25s | 4 | 0 | 11 | 19.4× |  |
-| 2 | Esgotos de Aurelis | 3 | 10 | 5m 31s | 9 | 61 | 67 | 21.2× |  |
-| 3 | Florestas de Sylmere | 10 | 16 | 8m 50s | 5 | 77 | 83 | 19.1× |  |
-| 4 | Torre Arcana | 16 | 20 | 7m 49s | 4 | 56 | 62 | 18.4× |  |
-| 5 | Colinas de Kaeshin | 20 | 24 | 9m 13s | 3 | 68 | 73 | 16.6× |  |
-| 6 | Caverna de Kaeshin | 24 | 29 | 13m 15s | 3 | 103 | 108 | 17.3× |  |
-| 7 | Dunas de Zahkar | 29 | 35 | 18m 12s | 1 | 155 | 160 | 16.2× |  |
-| 8 | Pirâmide Esquecida | 35 | 41 | 20m 43s | 2 | 178 | 183 | 17.1× |  |
-| 9 | Costa de Ventomar | 41 | 49 | 31m 1s | 2 | 283 | 288 | 17.8× |  |
-| 10 | Navio Naufragado | 49 | 49 | 30s | 1 | 0 | 4 | 17.0× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 6s | 2 | 0 | 11 | 19.4× |  |
+| 2 | Esgotos de Aurelis | 3 | 9 | 3m 55s | 6 | 43 | 49 | 21.2× |  |
+| 3 | Florestas de Sylmere | 9 | 16 | 9m 17s | 5 | 85 | 91 | 21.0× |  |
+| 4 | Torre Arcana | 16 | 20 | 7m 22s | 3 | 56 | 62 | 18.4× |  |
+| 5 | Colinas de Kaeshin | 20 | 24 | 8m 46s | 2 | 68 | 73 | 16.6× |  |
+| 6 | Caverna de Kaeshin | 24 | 28 | 10m 8s | 2 | 79 | 84 | 17.3× |  |
+| 7 | Dunas de Zahkar | 28 | 34 | 17m 11s | 2 | 145 | 150 | 17.0× |  |
+| 8 | Pirâmide Esquecida | 34 | 40 | 19m 50s | 2 | 169 | 174 | 17.8× |  |
+| 9 | Costa de Ventomar | 40 | 49 | 33m 47s | 2 | 312 | 317 | 18.4× |  |
+| 10 | Navio Naufragado | 49 | 49 | 29s | 1 | 0 | 4 | 17.0× |  |
 
 #### Arcanista
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 19s | 4 | 0 | 11 | 21.0× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 12s | 4 | 0 | 11 | 21.0× |  |
 | 2 | Esgotos de Aurelis | 3 | 10 | 4m 52s | 7 | 61 | 67 | 24.2× |  |
 | 3 | Florestas de Sylmere | 10 | 17 | 9m 6s | 5 | 97 | 103 | 24.1× |  |
 | 4 | Torre Arcana | 17 | 22 | 9m 2s | 4 | 85 | 91 | 23.1× |  |
@@ -116,37 +116,37 @@ Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 4 | 1m 40s | 5 | 5 | 16 | 24.5× |  |
-| 2 | Esgotos de Aurelis | 4 | 15 | 13m 29s | 16 | 202 | 208 | 30.6× |  |
-| 3 | Florestas de Sylmere | 15 | 25 | 22m 33s | 5 | 292 | 298 | 26.1× |  |
-| 4 | Torre Arcana | 25 | 31 | 17m 45s | 4 | 205 | 211 | 25.7× |  |
-| 5 | Colinas de Kaeshin | 31 | 37 | 20m 19s | 3 | 242 | 247 | 24.1× |  |
-| 6 | Caverna de Kaeshin | 37 | 43 | 22m 34s | 3 | 277 | 282 | 25.6× |  |
-| 7 | Dunas de Zahkar | 43 | 52 | 37m 10s | 2 | 503 | 508 | 25.4× |  |
-| 8 | Pirâmide Esquecida | 52 | 61 | 40m 54s | 2 | 582 | 587 | 27.0× |  |
-| 9 | Costa de Ventomar | 61 | 72 | 54m 4s | 2 | 835 | 840 | 28.3× |  |
-| 10 | Navio Naufragado | 72 | 72 | 18s | 1 | 0 | 4 | 27.7× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 6s | 4 | 0 | 11 | 24.5× |  |
+| 2 | Esgotos de Aurelis | 3 | 12 | 6m 30s | 10 | 107 | 113 | 30.6× |  |
+| 3 | Florestas de Sylmere | 12 | 21 | 12m 35s | 5 | 184 | 190 | 30.6× |  |
+| 4 | Torre Arcana | 21 | 27 | 11m 11s | 4 | 153 | 159 | 30.3× |  |
+| 5 | Colinas de Kaeshin | 27 | 32 | 10m 42s | 2 | 152 | 157 | 27.9× |  |
+| 6 | Caverna de Kaeshin | 32 | 37 | 11m 56s | 2 | 173 | 178 | 29.9× |  |
+| 7 | Dunas de Zahkar | 37 | 45 | 20m 55s | 2 | 335 | 340 | 30.2× |  |
+| 8 | Pirâmide Esquecida | 45 | 53 | 23m 12s | 2 | 392 | 397 | 32.3× |  |
+| 9 | Costa de Ventomar | 53 | 63 | 31m 29s | 2 | 581 | 586 | 33.8× |  |
+| 10 | Navio Naufragado | 63 | 63 | 15s | 1 | 0 | 4 | 33.0× |  |
 
 #### Infiltrador
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 4 | 1m 42s | 5 | 5 | 16 | 24.3× |  |
-| 2 | Esgotos de Aurelis | 4 | 15 | 14m 3s | 16 | 202 | 208 | 30.4× |  |
-| 3 | Florestas de Sylmere | 15 | 25 | 23m 37s | 5 | 292 | 298 | 25.5× |  |
-| 4 | Torre Arcana | 25 | 31 | 18m 29s | 4 | 205 | 211 | 25.0× |  |
-| 5 | Colinas de Kaeshin | 31 | 37 | 21m 3s | 3 | 242 | 247 | 23.4× |  |
-| 6 | Caverna de Kaeshin | 37 | 43 | 23m 12s | 3 | 277 | 282 | 24.8× |  |
-| 7 | Dunas de Zahkar | 43 | 52 | 37m 48s | 2 | 503 | 508 | 24.6× |  |
-| 8 | Pirâmide Esquecida | 52 | 60 | 36m 24s | 2 | 507 | 512 | 26.2× |  |
-| 9 | Costa de Ventomar | 60 | 71 | 53m 22s | 2 | 811 | 816 | 27.9× |  |
-| 10 | Navio Naufragado | 71 | 71 | 18s | 1 | 0 | 4 | 27.2× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 11s | 4 | 0 | 11 | 24.3× |  |
+| 2 | Esgotos de Aurelis | 3 | 14 | 11m 2s | 13 | 167 | 173 | 30.4× |  |
+| 3 | Florestas de Sylmere | 14 | 24 | 21m 19s | 5 | 266 | 272 | 26.9× |  |
+| 4 | Torre Arcana | 24 | 31 | 20m 14s | 4 | 233 | 239 | 26.1× |  |
+| 5 | Colinas de Kaeshin | 31 | 37 | 20m 4s | 2 | 242 | 247 | 23.4× |  |
+| 6 | Caverna de Kaeshin | 37 | 43 | 22m 14s | 2 | 277 | 282 | 24.8× |  |
+| 7 | Dunas de Zahkar | 43 | 51 | 32m 18s | 2 | 437 | 442 | 24.6× |  |
+| 8 | Pirâmide Esquecida | 51 | 59 | 35m 12s | 2 | 490 | 495 | 26.8× |  |
+| 9 | Costa de Ventomar | 59 | 70 | 51m 49s | 2 | 787 | 792 | 28.6× |  |
+| 10 | Navio Naufragado | 70 | 70 | 18s | 1 | 0 | 4 | 27.7× |  |
 
 #### Mercador
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 26s | 4 | 0 | 11 | 18.2× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 19s | 4 | 0 | 11 | 18.2× |  |
 | 2 | Esgotos de Aurelis | 3 | 10 | 6m 4s | 7 | 61 | 67 | 19.9× |  |
 | 3 | Florestas de Sylmere | 10 | 16 | 10m 13s | 5 | 77 | 83 | 17.2× |  |
 | 4 | Torre Arcana | 16 | 21 | 11m 46s | 4 | 76 | 82 | 16.4× |  |
@@ -161,16 +161,16 @@ Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 35s | 4 | 0 | 11 | 18.2× |  |
-| 2 | Esgotos de Aurelis | 3 | 11 | 9m 5s | 10 | 82 | 88 | 19.9× |  |
-| 3 | Florestas de Sylmere | 11 | 19 | 20m 43s | 5 | 137 | 143 | 15.6× |  |
-| 4 | Torre Arcana | 19 | 24 | 19m 20s | 4 | 102 | 108 | 13.5× |  |
-| 5 | Colinas de Kaeshin | 24 | 30 | 29m 11s | 3 | 155 | 160 | 11.9× |  |
-| 6 | Caverna de Kaeshin | 30 | 35 | 29m 36s | 3 | 154 | 159 | 11.7× |  |
-| 7 | Dunas de Zahkar | 35 | 43 | 56m 26s | 2 | 305 | 310 | 11.4× |  |
-| 8 | Pirâmide Esquecida | 43 | 52 | 1h 17m | 2 | 415 | 420 | 11.7× |  |
-| 9 | Costa de Ventomar | 52 | 64 | 2h 5m | 2 | 699 | 704 | 11.6× |  |
-| 10 | Navio Naufragado | 64 | 64 | 51s | 1 | 0 | 4 | 10.5× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 13s | 4 | 0 | 11 | 18.2× |  |
+| 2 | Esgotos de Aurelis | 3 | 10 | 6m 23s | 6 | 61 | 67 | 19.9× |  |
+| 3 | Florestas de Sylmere | 10 | 18 | 17m 48s | 6 | 121 | 127 | 17.2× |  |
+| 4 | Torre Arcana | 18 | 24 | 21m 2s | 4 | 118 | 124 | 14.4× |  |
+| 5 | Colinas de Kaeshin | 24 | 29 | 22m 36s | 2 | 124 | 129 | 11.9× |  |
+| 6 | Caverna de Kaeshin | 29 | 34 | 27m 25s | 3 | 145 | 150 | 12.3× |  |
+| 7 | Dunas de Zahkar | 34 | 43 | 59m 58s | 2 | 335 | 340 | 11.8× |  |
+| 8 | Pirâmide Esquecida | 43 | 51 | 1h 5m | 2 | 361 | 366 | 11.7× |  |
+| 9 | Costa de Ventomar | 51 | 63 | 2h | 2 | 676 | 681 | 11.9× |  |
+| 10 | Navio Naufragado | 63 | 63 | 51s | 1 | 0 | 4 | 10.8× |  |
 
 > "Monstros HP-negativo" = monstros em que `dano recebido/s > regen de HP/s` — o personagem só sobrevive porque cura ao matar; "Pior dano/regen" é a razão mais extrema vista no capítulo. "Mortes" só acontecem quando o personagem morre ANTES de matar o monstro (HP cheio não aguenta o `ttk`).
 
@@ -180,15 +180,12 @@ Personagem de referência: **Caçador** (snapshots tirados quando o nível cruza
 
 | Nível | Estágio (monstro) | Janela | XP offline | XP ativo | Ouro offline | Ouro ativo | Offline/Ativo (XP) | Offline/Ativo (Ouro) | Kills off vs ativo | net HP/s no estágio |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 20 | Espinho Vagante (Nv 39) | 1h | 41.972 | 59.959 | 54.059 | 77.228 | 70% | 70% | 336 vs 480 | -61.3 |
-| 20 | Espinho Vagante (Nv 39) | 4h | 167.886 | 239.838 | 216.238 | 308.911 | 70% | 70% | 1.343 vs 1.919 | -61.3 |
-| 20 | Espinho Vagante (Nv 39) | 8h | 335.773 | 479.676 | 432.476 | 617.822 | 70% | 70% | 2.686 vs 3.837 | -61.3 |
-| 50 | Djinn Menor (Nv 83) | 1h | 131.479 | 187.827 | 172.406 | 246.294 | 70% | 70% | 512 vs 731 | -121.9 |
-| 50 | Djinn Menor (Nv 83) | 4h | 525.914 | 751.306 | 689.623 | 985.176 | 70% | 70% | 2.046 vs 2.923 | -121.9 |
-| 50 | Djinn Menor (Nv 83) | 8h | 1.051.829 | 1.502.613 | 1.379.246 | 1.970.352 | 70% | 70% | 4.093 vs 5.847 | -121.9 |
-| 70 | Serpente Marinha Jovem (Nv 118) | 1h | 211.861 | 302.659 | 279.165 | 398.808 | 70% | 70% | 585 vs 836 | -181.0 |
-| 70 | Serpente Marinha Jovem (Nv 118) | 4h | 847.445 | 1.210.636 | 1.116.661 | 1.595.230 | 70% | 70% | 2.341 vs 3.344 | -181.0 |
-| 70 | Serpente Marinha Jovem (Nv 118) | 8h | 1.694.891 | 2.421.272 | 2.233.323 | 3.190.461 | 70% | 70% | 4.682 vs 6.689 | -181.0 |
+| 20 | Espinho Vagante (Nv 39) | 1h | 62.695 | 89.564 | 80.751 | 115.359 | 70% | 70% | 502 vs 717 | -61.3 |
+| 20 | Espinho Vagante (Nv 39) | 4h | 250.780 | 358.257 | 323.004 | 461.435 | 70% | 70% | 2.006 vs 2.866 | -61.3 |
+| 20 | Espinho Vagante (Nv 39) | 8h | 501.559 | 716.514 | 646.009 | 922.869 | 70% | 70% | 4.012 vs 5.732 | -61.3 |
+| 50 | Espectro Dourado (Nv 101) | 1h | 190.463 | 272.090 | 250.480 | 357.829 | 70% | 70% | 612 vs 875 | -166.4 |
+| 50 | Espectro Dourado (Nv 101) | 4h | 761.851 | 1.088.359 | 1.001.920 | 1.431.314 | 70% | 70% | 2.450 vs 3.500 | -166.4 |
+| 50 | Espectro Dourado (Nv 101) | 8h | 1.523.702 | 2.176.717 | 2.003.840 | 2.862.628 | 70% | 70% | 4.899 vs 6.999 | -166.4 |
 
 **Proporção offline/ativo (XP) média: 70%.** Alvo = `OFFLINE_EFFICIENCY_FACTOR` (70%). Como o offline agora usa o mesmo DPS do combate, a razão fica ≈ 70%; o resíduo que sobra vem de o "ativo" deste relatório descontar tempo de mortes (coluna "net HP/s"), enquanto o offline assume 0 mortes.
 

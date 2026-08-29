@@ -1,15 +1,15 @@
 classe,job_base,capitulo,regiao,nivel_entra,nivel_sai,segundos_simulados,mortes,kills_farm,monstros_hp_negativo,pior_dano_sobre_regen,parede
-Guerreiro,recruta,1,"Campos ao Redor de Aurelis",1,3,85,4,0,11,19.383,0
-Guerreiro,recruta,2,"Esgotos de Aurelis",3,10,331,9,61,67,21.199,0
-Guerreiro,recruta,3,"Florestas de Sylmere",10,16,530,5,77,83,19.070,0
-Guerreiro,recruta,4,"Torre Arcana",16,20,469,4,56,62,18.353,0
-Guerreiro,recruta,5,"Colinas de Kaeshin",20,24,553,3,68,73,16.639,0
-Guerreiro,recruta,6,"Caverna de Kaeshin",24,29,795,3,103,108,17.291,0
-Guerreiro,recruta,7,"Dunas de Zahkar",29,35,1092,1,155,160,16.185,0
-Guerreiro,recruta,8,"Pirâmide Esquecida",35,41,1243,2,178,183,17.120,0
-Guerreiro,recruta,9,"Costa de Ventomar",41,49,1861,2,283,288,17.801,0
-Guerreiro,recruta,10,"Navio Naufragado",49,49,30,1,0,4,16.963,0
-Arcanista,aprendiz,1,"Campos ao Redor de Aurelis",1,3,79,4,0,11,21.017,0
+Guerreiro,recruta,1,"Campos ao Redor de Aurelis",1,3,66,2,0,11,19.383,0
+Guerreiro,recruta,2,"Esgotos de Aurelis",3,9,235,6,43,49,21.199,0
+Guerreiro,recruta,3,"Florestas de Sylmere",9,16,557,5,85,91,20.997,0
+Guerreiro,recruta,4,"Torre Arcana",16,20,442,3,56,62,18.353,0
+Guerreiro,recruta,5,"Colinas de Kaeshin",20,24,526,2,68,73,16.639,0
+Guerreiro,recruta,6,"Caverna de Kaeshin",24,28,608,2,79,84,17.291,0
+Guerreiro,recruta,7,"Dunas de Zahkar",28,34,1031,2,145,150,16.955,0
+Guerreiro,recruta,8,"Pirâmide Esquecida",34,40,1190,2,169,174,17.805,0
+Guerreiro,recruta,9,"Costa de Ventomar",40,49,2027,2,312,317,18.375,0
+Guerreiro,recruta,10,"Navio Naufragado",49,49,29,1,0,4,16.963,0
+Arcanista,aprendiz,1,"Campos ao Redor de Aurelis",1,3,72,4,0,11,21.017,0
 Arcanista,aprendiz,2,"Esgotos de Aurelis",3,10,292,7,61,67,24.214,0
 Arcanista,aprendiz,3,"Florestas de Sylmere",10,17,546,5,97,103,24.066,0
 Arcanista,aprendiz,4,"Torre Arcana",17,22,542,4,85,91,23.118,0
@@ -19,27 +19,27 @@ Arcanista,aprendiz,7,"Dunas de Zahkar",32,40,1453,2,261,266,20.742,0
 Arcanista,aprendiz,8,"Pirâmide Esquecida",40,47,1504,2,271,276,21.201,0
 Arcanista,aprendiz,9,"Costa de Ventomar",47,58,2780,2,528,533,22.155,0
 Arcanista,aprendiz,10,"Navio Naufragado",58,58,24,0,0,4,20.500,0
-Caçador,batedor,1,"Campos ao Redor de Aurelis",1,4,100,5,5,16,24.459,0
-Caçador,batedor,2,"Esgotos de Aurelis",4,15,809,16,202,208,30.580,0
-Caçador,batedor,3,"Florestas de Sylmere",15,25,1353,5,292,298,26.070,0
-Caçador,batedor,4,"Torre Arcana",25,31,1065,4,205,211,25.671,0
-Caçador,batedor,5,"Colinas de Kaeshin",31,37,1219,3,242,247,24.089,0
-Caçador,batedor,6,"Caverna de Kaeshin",37,43,1354,3,277,282,25.555,0
-Caçador,batedor,7,"Dunas de Zahkar",43,52,2230,2,503,508,25.409,0
-Caçador,batedor,8,"Pirâmide Esquecida",52,61,2454,2,582,587,27.045,0
-Caçador,batedor,9,"Costa de Ventomar",61,72,3244,2,835,840,28.346,0
-Caçador,batedor,10,"Navio Naufragado",72,72,18,1,0,4,27.722,0
-Infiltrador,ladino,1,"Campos ao Redor de Aurelis",1,4,102,5,5,16,24.255,0
-Infiltrador,ladino,2,"Esgotos de Aurelis",4,15,843,16,202,208,30.364,0
-Infiltrador,ladino,3,"Florestas de Sylmere",15,25,1417,5,292,298,25.515,0
-Infiltrador,ladino,4,"Torre Arcana",25,31,1109,4,205,211,25.024,0
-Infiltrador,ladino,5,"Colinas de Kaeshin",31,37,1263,3,242,247,23.362,0
-Infiltrador,ladino,6,"Caverna de Kaeshin",37,43,1392,3,277,282,24.787,0
-Infiltrador,ladino,7,"Dunas de Zahkar",43,52,2268,2,503,508,24.562,0
-Infiltrador,ladino,8,"Pirâmide Esquecida",52,60,2184,2,507,512,26.193,0
-Infiltrador,ladino,9,"Costa de Ventomar",60,71,3202,2,811,816,27.942,0
-Infiltrador,ladino,10,"Navio Naufragado",71,71,18,1,0,4,27.227,0
-Mercador,negociante,1,"Campos ao Redor de Aurelis",1,3,86,4,0,11,18.229,0
+Caçador,batedor,1,"Campos ao Redor de Aurelis",1,3,66,4,0,11,24.459,0
+Caçador,batedor,2,"Esgotos de Aurelis",3,12,390,10,107,113,30.580,0
+Caçador,batedor,3,"Florestas de Sylmere",12,21,755,5,184,190,30.597,0
+Caçador,batedor,4,"Torre Arcana",21,27,671,4,153,159,30.276,0
+Caçador,batedor,5,"Colinas de Kaeshin",27,32,642,2,152,157,27.886,0
+Caçador,batedor,6,"Caverna de Kaeshin",32,37,716,2,173,178,29.867,0
+Caçador,batedor,7,"Dunas de Zahkar",37,45,1255,2,335,340,30.228,0
+Caçador,batedor,8,"Pirâmide Esquecida",45,53,1392,2,392,397,32.259,0
+Caçador,batedor,9,"Costa de Ventomar",53,63,1889,2,581,586,33.758,0
+Caçador,batedor,10,"Navio Naufragado",63,63,15,1,0,4,32.995,0
+Infiltrador,ladino,1,"Campos ao Redor de Aurelis",1,3,71,4,0,11,24.255,0
+Infiltrador,ladino,2,"Esgotos de Aurelis",3,14,662,13,167,173,30.364,0
+Infiltrador,ladino,3,"Florestas de Sylmere",14,24,1279,5,266,272,26.920,0
+Infiltrador,ladino,4,"Torre Arcana",24,31,1214,4,233,239,26.050,0
+Infiltrador,ladino,5,"Colinas de Kaeshin",31,37,1204,2,242,247,23.362,0
+Infiltrador,ladino,6,"Caverna de Kaeshin",37,43,1334,2,277,282,24.787,0
+Infiltrador,ladino,7,"Dunas de Zahkar",43,51,1938,2,437,442,24.562,0
+Infiltrador,ladino,8,"Pirâmide Esquecida",51,59,2112,2,490,495,26.803,0
+Infiltrador,ladino,9,"Costa de Ventomar",59,70,3109,2,787,792,28.559,0
+Infiltrador,ladino,10,"Navio Naufragado",70,70,18,1,0,4,27.740,0
+Mercador,negociante,1,"Campos ao Redor de Aurelis",1,3,79,4,0,11,18.229,0
 Mercador,negociante,2,"Esgotos de Aurelis",3,10,364,7,61,67,19.870,0
 Mercador,negociante,3,"Florestas de Sylmere",10,16,613,5,77,83,17.220,0
 Mercador,negociante,4,"Torre Arcana",16,21,706,4,76,82,16.386,0
@@ -49,13 +49,13 @@ Mercador,negociante,7,"Dunas de Zahkar",30,37,1686,2,198,203,13.994,0
 Mercador,negociante,8,"Pirâmide Esquecida",37,44,2006,2,236,241,14.358,0
 Mercador,negociante,9,"Costa de Ventomar",44,53,3027,2,369,374,14.664,0
 Mercador,negociante,10,"Navio Naufragado",53,53,38,1,0,4,13.844,0
-Acólito,novico,1,"Campos ao Redor de Aurelis",1,3,95,4,0,11,18.229,0
-Acólito,novico,2,"Esgotos de Aurelis",3,11,545,10,82,88,19.870,0
-Acólito,novico,3,"Florestas de Sylmere",11,19,1243,5,137,143,15.595,0
-Acólito,novico,4,"Torre Arcana",19,24,1160,4,102,108,13.485,0
-Acólito,novico,5,"Colinas de Kaeshin",24,30,1751,3,155,160,11.921,0
-Acólito,novico,6,"Caverna de Kaeshin",30,35,1776,3,154,159,11.703,0
-Acólito,novico,7,"Dunas de Zahkar",35,43,3386,2,305,310,11.353,0
-Acólito,novico,8,"Pirâmide Esquecida",43,52,4651,2,415,420,11.695,0
-Acólito,novico,9,"Costa de Ventomar",52,64,7526,2,699,704,11.602,0
-Acólito,novico,10,"Navio Naufragado",64,64,51,1,0,4,10.500,0
+Acólito,novico,1,"Campos ao Redor de Aurelis",1,3,73,4,0,11,18.229,0
+Acólito,novico,2,"Esgotos de Aurelis",3,10,383,6,61,67,19.870,0
+Acólito,novico,3,"Florestas de Sylmere",10,18,1068,6,121,127,17.220,0
+Acólito,novico,4,"Torre Arcana",18,24,1262,4,118,124,14.385,0
+Acólito,novico,5,"Colinas de Kaeshin",24,29,1356,2,124,129,11.921,0
+Acólito,novico,6,"Caverna de Kaeshin",29,34,1645,3,145,150,12.257,0
+Acólito,novico,7,"Dunas de Zahkar",34,43,3598,2,335,340,11.825,0
+Acólito,novico,8,"Pirâmide Esquecida",43,51,3953,2,361,366,11.695,0
+Acólito,novico,9,"Costa de Ventomar",51,63,7202,2,676,681,11.933,0
+Acólito,novico,10,"Navio Naufragado",63,63,51,1,0,4,10.756,0

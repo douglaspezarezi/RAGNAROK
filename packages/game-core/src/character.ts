@@ -170,7 +170,11 @@ export const CHARACTER_TUNING = {
   SP_PER_INT: 6,
 
   ATK_PER_FOR: 2,
-  ATK_PER_DES: 0.5,
+  /**
+   * Dano físico por ponto de DES. Elevado de 0.5 → 1.2 para builds de DES
+   * (Caçador) deixarem de render ~1/4 do dano de FOR por ponto; agora ~60%.
+   */
+  ATK_PER_DES: 1.2,
   ATK_PER_LEVEL: 1,
 
   MATK_PER_INT: 2,

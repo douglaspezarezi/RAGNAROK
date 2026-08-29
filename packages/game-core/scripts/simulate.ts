@@ -715,8 +715,9 @@ function buildReport(
     p(
       `- **Dispersão entre classes: ${disp.toFixed(1)}×** (mais rápida \`${fast[0]!.line}\` ` +
         `${fmtDuration(fast[0]!.totalSeconds)} · mais lenta \`${fast[fast.length - 1]!.line}\` ` +
-        `${fmtDuration(fast[fast.length - 1]!.totalSeconds)}). Builds físicas puras (FOR) são as ` +
-        `mais rápidas; builds baseadas em DES/INT/VIT rendem menos dano por ponto neste modelo. ` +
+        `${fmtDuration(fast[fast.length - 1]!.totalSeconds)}). Builds concentradas em dano (FOR ou ` +
+        `DES) são as mais rápidas; builds que pulverizam pontos em VIT/INT (Acólito, Mercador) ` +
+        `demoram mais porque parte do investimento não vira dano. ` +
         `${anyWall ? "Alguma classe bateu numa parede — ver Seção 1." : "Nenhuma classe travou numa parede."}`,
     );
     p(
