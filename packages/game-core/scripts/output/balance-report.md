@@ -1,6 +1,6 @@
 # Relatório de balanceamento — RAGNAROK
 
-Gerado em 2026-08-29T17:27:33.189Z · `npm run simulate` (packages/game-core)
+Gerado em 2026-08-29T17:33:19.474Z · `npm run simulate` (packages/game-core)
 
 > Combate/recompensas/offline/gacha vêm de **@game/core** (inalterados). Curva de XP, ganho de atributo por nível e builds por classe são **premissas do harness** (marcadas abaixo).
 
@@ -9,7 +9,7 @@ Gerado em 2026-08-29T17:27:33.189Z · `npm run simulate` (packages/game-core)
 - **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 56m–6h 9m** de jogo simulado, terminando entre **Nv 49 e Nv 72**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
 - **Dispersão entre classes: 3.2×** (mais rápida `Guerreiro` 1h 56m · mais lenta `Acólito` 6h 9m). Builds físicas puras (FOR) são as mais rápidas; builds baseadas em DES/INT/VIT rendem menos dano por ponto neste modelo. Nenhuma classe travou numa parede.
 - **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **11× a 31×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **30–43** no total.
-- **Offline rende 86% do jogo ativo em média** (faixa 61–123%), contra o alvo de `OFFLINE_EFFICIENCY_FACTOR` = **70%**. O modelo offline usa uma taxa fixa de kills/hora que não acompanha a dificuldade real do estágio, então superestima em alvos de HP alto e subestima em alvos fracos.
+- **Offline rende 70% do jogo ativo em média** (faixa 70–70%), alvo `OFFLINE_EFFICIENCY_FACTOR` = **70%**. Calibrado: o offline deriva kills/h do DPS real do personagem, então a razão fica ≈ 70% em qualquer estágio (antes usava taxa fixa `f(nível)` e variava de ~60% a ~125%).
 - **Gacha saudável.** Distribuição por tier a ≤ **0.64 p.p.** do nominal; pity respeitado (gap máximo entre Tier S = **61**, teto teórico 61). Poucos S vêm da garantia de pity — a maioria sai no sorteio.
 
 ## Constantes usadas
@@ -35,7 +35,7 @@ Gerado em 2026-08-29T17:27:33.189Z · `npm run simulate` (packages/game-core)
 | monster.ts | BOSS_MULTIPLIER (Mini/MVP/MVP_FINAL) | 6 / 20 / 40 |
 | offlineProgress.ts | OFFLINE_EFFICIENCY_FACTOR | 0.7 |
 | offlineProgress.ts | OFFLINE_CAP_HOURS | 8 |
-| offlineProgress.ts | KILLS_PER_HOUR_BASE / _LEVEL_PENALTY / MIN | 900 / 1.5 / 60 |
+| offlineProgress.ts | kills/h offline | DPS real / HP do monstro × 3600 (clamp 60–7200) |
 | gacha.ts | SUMMON_RATES (C/B/A/S) | 0.5 / 0.3 / 0.15 / 0.05 |
 | gacha.ts | PITY_THRESHOLD | 60 |
 
@@ -176,21 +176,21 @@ Gerado em 2026-08-29T17:27:33.189Z · `npm run simulate` (packages/game-core)
 
 ## 2. Progresso offline vs. jogo ativo
 
-Personagem de referência: **Caçador** (snapshots tirados quando o nível cruza 20, 50, 70). "Ativo" = kills reais/s do combate (`simulateCombatTick`) × recompensa por kill. "Offline" = `calculateOfflineRewards` (usa `OFFLINE_EFFICIENCY_FACTOR = 0.7` e `KILLS_PER_HOUR = 900 − 1.5·nível_do_monstro`, independente do DPS real).
+Personagem de referência: **Caçador** (snapshots tirados quando o nível cruza 20, 50, 70). "Ativo" = kills reais/s do combate (`simulateCombatTick`) × recompensa por kill. "Offline" = `calculateOfflineRewards`, que agora deriva kills/h do DPS real do personagem no estágio (`DPS / HP_do_monstro × 3600`) e aplica `OFFLINE_EFFICIENCY_FACTOR = 0.7` — então a razão deve ficar ≈ 70% por construção.
 
 | Nível | Estágio (monstro) | Janela | XP offline | XP ativo | Ouro offline | Ouro ativo | Offline/Ativo (XP) | Offline/Ativo (Ouro) | Kills off vs ativo | net HP/s no estágio |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 20 | Espinho Vagante (Nv 39) | 1h | 73.631 | 59.959 | 94.837 | 77.228 | 123% | 123% | 589 vs 480 | -61.3 |
-| 20 | Espinho Vagante (Nv 39) | 4h | 294.525 | 239.838 | 379.348 | 308.911 | 123% | 123% | 2.356 vs 1.919 | -61.3 |
-| 20 | Espinho Vagante (Nv 39) | 8h | 589.050 | 479.676 | 758.696 | 617.822 | 123% | 123% | 4.712 vs 3.837 | -61.3 |
-| 50 | Djinn Menor (Nv 83) | 1h | 139.512 | 187.827 | 182.940 | 246.294 | 74% | 74% | 543 vs 731 | -121.9 |
-| 50 | Djinn Menor (Nv 83) | 4h | 558.050 | 751.306 | 731.762 | 985.176 | 74% | 74% | 2.171 vs 2.923 | -121.9 |
-| 50 | Djinn Menor (Nv 83) | 8h | 1.116.100 | 1.502.613 | 1.463.524 | 1.970.352 | 74% | 74% | 4.343 vs 5.847 | -121.9 |
-| 70 | Serpente Marinha Jovem (Nv 118) | 1h | 183.208 | 302.659 | 241.410 | 398.808 | 61% | 61% | 506 vs 836 | -181.0 |
-| 70 | Serpente Marinha Jovem (Nv 118) | 4h | 732.833 | 1.210.636 | 965.639 | 1.595.230 | 61% | 61% | 2.024 vs 3.344 | -181.0 |
-| 70 | Serpente Marinha Jovem (Nv 118) | 8h | 1.465.666 | 2.421.272 | 1.931.278 | 3.190.461 | 61% | 61% | 4.049 vs 6.689 | -181.0 |
+| 20 | Espinho Vagante (Nv 39) | 1h | 41.972 | 59.959 | 54.059 | 77.228 | 70% | 70% | 336 vs 480 | -61.3 |
+| 20 | Espinho Vagante (Nv 39) | 4h | 167.886 | 239.838 | 216.238 | 308.911 | 70% | 70% | 1.343 vs 1.919 | -61.3 |
+| 20 | Espinho Vagante (Nv 39) | 8h | 335.773 | 479.676 | 432.476 | 617.822 | 70% | 70% | 2.686 vs 3.837 | -61.3 |
+| 50 | Djinn Menor (Nv 83) | 1h | 131.479 | 187.827 | 172.406 | 246.294 | 70% | 70% | 512 vs 731 | -121.9 |
+| 50 | Djinn Menor (Nv 83) | 4h | 525.914 | 751.306 | 689.623 | 985.176 | 70% | 70% | 2.046 vs 2.923 | -121.9 |
+| 50 | Djinn Menor (Nv 83) | 8h | 1.051.829 | 1.502.613 | 1.379.246 | 1.970.352 | 70% | 70% | 4.093 vs 5.847 | -121.9 |
+| 70 | Serpente Marinha Jovem (Nv 118) | 1h | 211.861 | 302.659 | 279.165 | 398.808 | 70% | 70% | 585 vs 836 | -181.0 |
+| 70 | Serpente Marinha Jovem (Nv 118) | 4h | 847.445 | 1.210.636 | 1.116.661 | 1.595.230 | 70% | 70% | 2.341 vs 3.344 | -181.0 |
+| 70 | Serpente Marinha Jovem (Nv 118) | 8h | 1.694.891 | 2.421.272 | 2.233.323 | 3.190.461 | 70% | 70% | 4.682 vs 6.689 | -181.0 |
 
-**Proporção offline/ativo (XP) média: 86%.** Alvo saudável ≈ `OFFLINE_EFFICIENCY_FACTOR` (70%). Muito abaixo → offline punitivo; perto/acima de 100% → jogar ativo perde o sentido. A diferença entre a proporção e 70% vem do descasamento entre `KILLS_PER_HOUR` do modelo offline e a velocidade real de kill do combate (coluna "Kills off vs ativo").
+**Proporção offline/ativo (XP) média: 70%.** Alvo = `OFFLINE_EFFICIENCY_FACTOR` (70%). Como o offline agora usa o mesmo DPS do combate, a razão fica ≈ 70%; o resíduo que sobra vem de o "ativo" deste relatório descontar tempo de mortes (coluna "net HP/s"), enquanto o offline assume 0 mortes.
 
 ## 3. Gacha
 

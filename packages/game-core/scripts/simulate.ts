@@ -726,12 +726,17 @@ function buildReport(
         `Mortes reais (morrer antes de matar) por classe: **${minDeaths}–${maxDeaths}** no total.`,
     );
     if (offRatios.length) {
+      const target = OFFLINE_EFFICIENCY_FACTOR * 100;
+      const aligned = offMin * 100 >= target - 2 && offMax * 100 <= target + 2;
       p(
         `- **Offline rende ${(offAvg * 100).toFixed(0)}% do jogo ativo em média** ` +
-          `(faixa ${(offMin * 100).toFixed(0)}–${(offMax * 100).toFixed(0)}%), contra o alvo de ` +
-          `\`OFFLINE_EFFICIENCY_FACTOR\` = **${(OFFLINE_EFFICIENCY_FACTOR * 100).toFixed(0)}%**. ` +
-          `O modelo offline usa uma taxa fixa de kills/hora que não acompanha a dificuldade real do ` +
-          `estágio, então superestima em alvos de HP alto e subestima em alvos fracos.`,
+          `(faixa ${(offMin * 100).toFixed(0)}–${(offMax * 100).toFixed(0)}%), alvo ` +
+          `\`OFFLINE_EFFICIENCY_FACTOR\` = **${target.toFixed(0)}%**. ` +
+          (aligned
+            ? `Calibrado: o offline deriva kills/h do DPS real do personagem, então a razão fica ` +
+              `≈ ${target.toFixed(0)}% em qualquer estágio (antes usava taxa fixa \`f(nível)\` e ` +
+              `variava de ~60% a ~125%).`
+            : `Ainda descasado do alvo — ver Seção 2.`),
       );
     }
     p(
@@ -768,7 +773,7 @@ function buildReport(
         ["monster.ts", "BOSS_MULTIPLIER (Mini/MVP/MVP_FINAL)", `${BOSS_MULTIPLIER.Mini} / ${BOSS_MULTIPLIER.MVP} / ${BOSS_MULTIPLIER.MVP_FINAL}`],
         ["offlineProgress.ts", "OFFLINE_EFFICIENCY_FACTOR", `${OFFLINE_EFFICIENCY_FACTOR}`],
         ["offlineProgress.ts", "OFFLINE_CAP_HOURS", `${OFFLINE_CAP_HOURS}`],
-        ["offlineProgress.ts", "KILLS_PER_HOUR_BASE / _LEVEL_PENALTY / MIN", `${OFFLINE_TUNING.KILLS_PER_HOUR_BASE} / ${OFFLINE_TUNING.KILLS_PER_HOUR_LEVEL_PENALTY} / ${OFFLINE_TUNING.MIN_KILLS_PER_HOUR}`],
+        ["offlineProgress.ts", "kills/h offline", `DPS real / HP do monstro × 3600 (clamp ${OFFLINE_TUNING.MIN_KILLS_PER_HOUR}–${OFFLINE_TUNING.MAX_KILLS_PER_HOUR})`],
         ["gacha.ts", "SUMMON_RATES (C/B/A/S)", `${SUMMON_RATES.C} / ${SUMMON_RATES.B} / ${SUMMON_RATES.A} / ${SUMMON_RATES.S}`],
         ["gacha.ts", "PITY_THRESHOLD", `${PITY_THRESHOLD}`],
       ],
@@ -892,8 +897,10 @@ function buildReport(
   p(
     `Personagem de referência: **${CONFIG.OFFLINE_REFERENCE_CLASS}** (snapshots tirados quando o nível cruza ${CONFIG.OFFLINE_TEST_LEVELS.join(", ")}). ` +
       `"Ativo" = kills reais/s do combate (\`simulateCombatTick\`) × recompensa por kill. ` +
-      `"Offline" = \`calculateOfflineRewards\` (usa \`OFFLINE_EFFICIENCY_FACTOR = ${OFFLINE_EFFICIENCY_FACTOR}\` e ` +
-      `\`KILLS_PER_HOUR = ${OFFLINE_TUNING.KILLS_PER_HOUR_BASE} − ${OFFLINE_TUNING.KILLS_PER_HOUR_LEVEL_PENALTY}·nível_do_monstro\`, independente do DPS real).`,
+      `"Offline" = \`calculateOfflineRewards\`, que agora deriva kills/h do DPS real ` +
+      `do personagem no estágio (\`DPS / HP_do_monstro × 3600\`) e aplica ` +
+      `\`OFFLINE_EFFICIENCY_FACTOR = ${OFFLINE_EFFICIENCY_FACTOR}\` — então a razão deve ficar ≈ ` +
+      `${(OFFLINE_EFFICIENCY_FACTOR * 100).toFixed(0)}% por construção.`,
   );
   p();
   if (offline.length === 0) {
@@ -925,10 +932,10 @@ function buildReport(
       const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
       p(
         `**Proporção offline/ativo (XP) média: ${(avg * 100).toFixed(0)}%.** ` +
-          `Alvo saudável ≈ \`OFFLINE_EFFICIENCY_FACTOR\` (${(OFFLINE_EFFICIENCY_FACTOR * 100).toFixed(0)}%). ` +
-          `Muito abaixo → offline punitivo; perto/acima de 100% → jogar ativo perde o sentido. ` +
-          `A diferença entre a proporção e ${(OFFLINE_EFFICIENCY_FACTOR * 100).toFixed(0)}% vem do descasamento entre ` +
-          `\`KILLS_PER_HOUR\` do modelo offline e a velocidade real de kill do combate (coluna "Kills off vs ativo").`,
+          `Alvo = \`OFFLINE_EFFICIENCY_FACTOR\` (${(OFFLINE_EFFICIENCY_FACTOR * 100).toFixed(0)}%). ` +
+          `Como o offline agora usa o mesmo DPS do combate, a razão fica ≈ ${(OFFLINE_EFFICIENCY_FACTOR * 100).toFixed(0)}%; ` +
+          `o resíduo que sobra vem de o "ativo" deste relatório descontar tempo de mortes ` +
+          `(coluna "net HP/s"), enquanto o offline assume 0 mortes.`,
       );
     }
   }

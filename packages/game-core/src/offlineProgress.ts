@@ -6,18 +6,23 @@
  *                        × horas_offline
  *                        × fator_eficiência
  *
- * com `horas_offline` limitado por um teto (`OFFLINE_CAP_HOURS`) e
- * `fator_eficiência` (`OFFLINE_EFFICIENCY_FACTOR`) < 1 para o farm ativo seguir
- * mais vantajoso. Ambos ficam como constantes nomeadas e fáceis de ajustar.
+ * "Recompensa_por_hora" agora vem do **DPS real do personagem** no estágio
+ * (mesma resolução de `simulateCombatTick`: `kills/h = DPS / HP_do_monstro × 3600`),
+ * em vez de uma heurística `f(nível_do_monstro)` que não acompanhava a força do
+ * personagem. Com isso, offline ≈ `OFFLINE_EFFICIENCY_FACTOR` do farm ativo por
+ * construção. `horas_offline` é limitado por `OFFLINE_CAP_HOURS`.
  *
  * Convenção: `stageId` é o `id` do monstro farmado naquele estágio.
- * Função pura.
+ * Função pura (determinística — sem RNG).
  */
 
 import { MONSTERS_BY_ID, type Monster } from "@game/data";
-import type { CharacterState } from "./character";
-import { killBaseRewards, resolveMonsterDefeat } from "./combat";
-import { bossFactorKey } from "./monster";
+import { calculateDerivedStats, type CharacterState } from "./character";
+import {
+  killBaseRewards,
+  resolveMonsterDefeat,
+  simulateCombatTick,
+} from "./combat";
 import { getRebirthMultiplier } from "./rebirth";
 
 /** Teto de horas de progresso offline acumulável (GDD: "8 horas"). */
@@ -27,14 +32,10 @@ export const OFFLINE_CAP_HOURS = 8;
 export const OFFLINE_EFFICIENCY_FACTOR = 0.7;
 
 export const OFFLINE_TUNING = {
-  /** Kills/hora num estágio nominal (≈ 1 kill a cada 4s). */
-  KILLS_PER_HOUR_BASE: 900,
-  /** Penalidade de kills/hora por nível do monstro do estágio. */
-  KILLS_PER_HOUR_LEVEL_PENALTY: 1.5,
-  /** Piso de kills/hora (estágios muito altos). */
+  /** Piso de kills/hora (evita que um estágio quase invencível zere o offline). */
   MIN_KILLS_PER_HOUR: 60,
-  /** Estágios de chefe rendem menos kills/hora. */
-  BOSS_KILLS_PER_HOUR_FACTOR: 0.15,
+  /** Teto de sanidade para os kills/hora derivados do combate. */
+  MAX_KILLS_PER_HOUR: 7200,
 } as const;
 
 export interface OfflineRewardsSummary {
@@ -61,14 +62,20 @@ export interface OfflineRewardsSummary {
   companionFragments: { companionId: string; amount: number } | null;
 }
 
-function killsPerHourFor(monster: Monster): number {
-  const raw =
-    OFFLINE_TUNING.KILLS_PER_HOUR_BASE -
-    OFFLINE_TUNING.KILLS_PER_HOUR_LEVEL_PENALTY * monster.level;
-  const withFloor = Math.max(OFFLINE_TUNING.MIN_KILLS_PER_HOUR, raw);
-  return bossFactorKey(monster) === "none"
-    ? withFloor
-    : withFloor * OFFLINE_TUNING.BOSS_KILLS_PER_HOUR_FACTOR;
+/**
+ * Kills/hora reais do personagem no estágio: `DPS / HP_do_monstro × 3600`, com
+ * piso/teto de sanidade. O HP de chefe (multiplicador de `deriveMonsterStats`)
+ * já entra aqui via `simulateCombatTick`, então não precisa de fator separado.
+ * Retorna 0 se o personagem não consegue causar dano ao monstro.
+ */
+function killsPerHourFor(character: CharacterState, monster: Monster): number {
+  const tick = simulateCombatTick(calculateDerivedStats(character), monster, 1);
+  if (tick.damageDealt <= 0) return 0;
+  const perHour = (tick.damageDealt / tick.monsterMaxHp) * 3600;
+  return Math.min(
+    OFFLINE_TUNING.MAX_KILLS_PER_HOUR,
+    Math.max(OFFLINE_TUNING.MIN_KILLS_PER_HOUR, perHour),
+  );
 }
 
 function emptySummary(
@@ -131,7 +138,7 @@ export function calculateOfflineRewards(
   }
 
   const hours = credited / 3600;
-  const killsPerHour = killsPerHourFor(monster);
+  const killsPerHour = killsPerHourFor(character, monster);
   const effectiveKills = killsPerHour * hours * OFFLINE_EFFICIENCY_FACTOR;
 
   const base = killBaseRewards(monster);
