@@ -75,6 +75,11 @@ export interface Monster {
   bossRank?: BossRank;
   /** `true` apenas para o "MVP Final" do capítulo 10. */
   isFinalBoss?: boolean;
+  /**
+   * URL/caminho do sprite real, quando houver arte. Ausente -> a UI usa o
+   * placeholder (forma+cor por raça) e/ou tenta `public/sprites/monsters/{id}.png`.
+   */
+  spriteUrl?: string;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -189,4 +194,10 @@ export interface Companion {
   description: string;
   /** Nome alternativo, quando o GDD lista dois nomes para o mesmo companheiro. */
   aka?: string;
+  /**
+   * URL/caminho do sprite real, quando houver arte. Ausente -> a UI usa o
+   * placeholder (forma+cor por tier) e/ou tenta
+   * `public/sprites/companions/{id}.png`.
+   */
+  spriteUrl?: string;
 }

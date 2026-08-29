@@ -2,7 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { CHAPTERS, JOBS_BY_ID, MONSTERS_BY_ID } from "@game/data";
+import {
+  CHAPTERS,
+  COMPANIONS_BY_ID,
+  JOBS_BY_ID,
+  MONSTERS_BY_ID,
+  type Companion,
+  type Monster,
+} from "@game/data";
 import {
   calculateDerivedStats,
   canRebirth,
@@ -21,8 +28,16 @@ import {
   useGameSave,
   xpToNextLevel,
 } from "@/lib/gameStore";
-import { heroSprite, monsterSprite } from "@/lib/sprites";
-import { BattleArena, type Floater } from "./BattleArena";
+import {
+  classGlyph,
+  classPlaceholderColor,
+  companionGlyph,
+  companionPlaceholderColor,
+  elementColor,
+  raceGlyph,
+  racePlaceholderColor,
+} from "@/lib/sprites";
+import { BattleArena, type Combatant, type Floater } from "./BattleArena";
 import { CombatLog, type LogEntry } from "./CombatLog";
 import { RebirthModal } from "./RebirthModal";
 import { StatusPanel } from "./StatusPanel";
@@ -31,8 +46,26 @@ const TICK_MS = 1000;
 const MAX_LOG = 40;
 const MAX_FLOATERS = 14;
 const FLOATER_LIFETIME_MS = 950;
+const DEATH_FADE_MS = 380;
 
 const FALLBACK_MONSTER = MONSTERS_BY_ID.get("gotinha")!;
+
+const TIER_RANK: Record<string, number> = { S: 4, A: 3, B: 2, C: 1 };
+
+/** "Companheiro ativo" = o de maior tier que o jogador possui (sem slot de equipar ainda). */
+function pickActiveCompanion(
+  companionFragments: Record<string, number>,
+): Companion | null {
+  const owned = Object.keys(companionFragments)
+    .map((id) => COMPANIONS_BY_ID.get(id))
+    .filter((c): c is Companion => Boolean(c));
+  if (owned.length === 0) return null;
+  return (
+    [...owned].sort(
+      (a, b) => (TIER_RANK[b.tier] ?? 0) - (TIER_RANK[a.tier] ?? 0),
+    )[0] ?? null
+  );
+}
 
 function chapterName(chapterNumber: number): string {
   return (
@@ -56,14 +89,27 @@ export function Game() {
     MONSTERS_BY_ID.get(character.currentStageId) ?? FALLBACK_MONSTER;
   const monsterStats = useMemo(() => deriveMonsterStats(monster), [monster]);
 
+  const activeCompanion = useMemo(
+    () => pickActiveCompanion(save.companionFragments),
+    [save.companionFragments],
+  );
+
   const [currentHp, setCurrentHp] = useState(derived.maxHp);
   const [currentSp, setCurrentSp] = useState(derived.maxSp);
   const [monsterHp, setMonsterHp] = useState(monsterStats.maxHp);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [paused, setPaused] = useState(false);
+  /** monstro em fade-out de morte (mostra o que caiu até o próximo entrar). */
+  const [dyingMonster, setDyingMonster] = useState<Monster | null>(null);
 
   // efeitos visuais da cena de batalha
-  const [fx, setFx] = useState({ n: 0, heroHurt: false, monsterHit: false });
+  const [fx, setFx] = useState({
+    n: 0,
+    heroAttack: false,
+    heroHurt: false,
+    companionAttack: false,
+    monsterHit: false,
+  });
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const floaterSeq = useRef(0);
 
@@ -113,7 +159,7 @@ export function Game() {
   const tickRef = useRef<() => void>(() => {});
   tickRef.current = () => {
     // aba em segundo plano -> o tempo vira "progresso offline" ao voltar
-    if (paused || document.hidden) return;
+    if (paused || document.hidden || dyingMonster) return;
 
     const activeMonster = MONSTERS_BY_ID.get(character.currentStageId);
     if (!activeMonster) return;
@@ -133,7 +179,9 @@ export function Game() {
 
     setFx((prev) => ({
       n: prev.n + 1,
+      heroAttack: dealt > 0,
       heroHurt: taken > 0,
+      companionAttack: dealt > 0 && activeCompanion !== null,
       monsterHit: dealt > 0,
     }));
     if (dealt > 0) pushFloater("monster", "dmg", `-${dealt}`);
@@ -183,6 +231,10 @@ export function Game() {
     );
     pushFloater("monster", "defeat", "💥");
     pushFloater("monster", "info", `+${rewards.xp} XP`);
+
+    // fade-out de morte antes do próximo monstro entrar
+    setDyingMonster(activeMonster);
+    window.setTimeout(() => setDyingMonster(null), DEATH_FADE_MS);
 
     if (sealDropped && rewards.sealFragment) {
       addLog(`✨ Fragmento de Selo obtido (${rewards.sealFragment.sealId})`);
@@ -234,6 +286,58 @@ export function Game() {
   const rebirthAvailable = canRebirth(character);
   const rebirthMult = getRebirthMultiplier(character);
 
+  // ---- combatentes para a cena (só render — nenhuma regra) ----
+  const shownMonster = dyingMonster ?? monster;
+  const shownMonsterStats = dyingMonster
+    ? deriveMonsterStats(dyingMonster)
+    : monsterStats;
+
+  const heroCombatant: Combatant = {
+    sprite: {
+      kind: "character",
+      id: character.jobId,
+      color: classPlaceholderColor(job?.line),
+      glyph: classGlyph(job?.line),
+    },
+    name: `${job?.name ?? character.jobId} · Nv ${character.level}`,
+    sub: job?.line,
+    hp: currentHp,
+    maxHp: derived.maxHp,
+    sp: currentSp,
+    maxSp: derived.maxSp,
+  };
+
+  const companionCombatant: Combatant | null = activeCompanion
+    ? {
+        sprite: {
+          kind: "companion",
+          id: activeCompanion.id,
+          spriteUrl: activeCompanion.spriteUrl,
+          color: companionPlaceholderColor(activeCompanion.tier),
+          glyph: companionGlyph(activeCompanion.tier),
+        },
+        name: activeCompanion.name,
+        sub: `${activeCompanion.tier} · ${activeCompanion.role}`,
+      }
+    : null;
+
+  const monsterCombatant: Combatant = {
+    sprite: {
+      kind: "monster",
+      id: shownMonster.id,
+      spriteUrl: shownMonster.spriteUrl,
+      color: racePlaceholderColor(shownMonster.race),
+      glyph: raceGlyph(shownMonster.race),
+    },
+    name: shownMonster.name,
+    sub: `Nv ${shownMonster.level} · ${shownMonster.race} · ${shownMonster.element} ${shownMonster.elementLevel} · ${shownMonster.size}`,
+    hp: dyingMonster ? 0 : monsterHp,
+    maxHp: shownMonsterStats.maxHp,
+    isBoss: shownMonster.isBoss,
+    bossRank: shownMonster.bossRank,
+    auraColor: elementColor(shownMonster.element),
+  };
+
   return (
     <main className="mx-auto max-w-5xl space-y-4 p-4 sm:p-6">
       <header className="flex flex-wrap items-center justify-between gap-2">
@@ -269,23 +373,17 @@ export function Game() {
       <BattleArena
         chapterNumber={currentChapter}
         chapterLabel={chapterName(currentChapter)}
-        heroEmoji={heroSprite(job?.line)}
-        heroName={job?.name ?? character.jobId}
-        heroLine={job?.line}
-        heroLevel={character.level}
-        heroHp={currentHp}
-        heroMaxHp={derived.maxHp}
-        heroSp={currentSp}
-        heroMaxSp={derived.maxSp}
+        hero={heroCombatant}
+        companion={companionCombatant}
+        monster={monsterCombatant}
+        monsterDying={dyingMonster !== null}
         xp={character.xp ?? 0}
         xpMax={xpToNextLevel(character.level)}
         gold={save.gold}
-        monster={monster}
-        monsterEmoji={monsterSprite(monster)}
-        monsterHp={monsterHp}
-        monsterMaxHp={monsterStats.maxHp}
         fxTick={fx.n}
+        heroAttack={fx.heroAttack}
         heroHurt={fx.heroHurt}
+        companionAttack={fx.companionAttack}
         monsterHit={fx.monsterHit}
         floaters={floaters}
         paused={paused}

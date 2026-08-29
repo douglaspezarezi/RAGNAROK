@@ -26,12 +26,12 @@ body {
 }
 
 /* ======================================================================
-   Cena de batalha (protótipo)
+   Cena de batalha (placeholder — sem arte final)
    ====================================================================== */
 
 .rk-arena {
   position: relative;
-  height: clamp(240px, 34vw, 300px);
+  height: clamp(300px, 34vw, 360px);
   border-radius: 16px;
   overflow: hidden;
   color: #e5e7eb;
@@ -43,7 +43,7 @@ body {
   position: absolute;
   top: 10px;
   left: 12px;
-  z-index: 2;
+  z-index: 4;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -56,59 +56,113 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  height: 80px;
+  height: 78px;
   background: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.05),
-    rgba(0, 0, 0, 0.28)
+    rgba(0, 0, 0, 0.3)
   );
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.rk-slot {
+/* ---- palco: grupo do jogador à esquerda, monstro à direita ---- */
+.rk-stage {
   position: absolute;
-  bottom: 42px;
-  z-index: 1;
+  inset: 22px 20px 38px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.rk-party {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  min-width: 200px;
+}
+
+.rk-combatant {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  width: min(190px, 40vw);
-}
-.rk-slot-hero {
-  left: 5%;
-}
-.rk-slot-monster {
-  right: 5%;
 }
 
-.rk-sprite-wrap {
+/* companheiro: à direita e um pouco atrás do herói, menor */
+.rk-combatant-companion {
+  position: absolute;
+  left: 128px;
+  bottom: 30px;
+  z-index: 1;
+  opacity: 0.92;
+}
+.rk-combatant-hero {
+  position: relative;
+  z-index: 2;
+}
+.rk-combatant-monster {
+  z-index: 2;
+}
+
+/* ---- barras HP/SP sobre o combatente ---- */
+.rk-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: min(150px, 34vw);
+}
+.rk-meter-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.8);
+}
+.rk-meter-track {
+  margin-top: 2px;
+  height: 7px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+.rk-meter-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+/* ---- figura (SpriteFigure) ---- */
+.rk-figure-wrap {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-top: 4px;
+  margin-top: 2px;
 }
-
-.rk-sprite {
-  font-size: clamp(48px, 12vw, 88px);
-  line-height: 1;
-  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5));
+.rk-figure {
+  display: block;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45));
 }
-.rk-slot-hero .rk-sprite {
-  transform: scaleX(-1); /* herói "olhando" para o monstro */
-}
-.rk-slot-hero .rk-sprite span {
-  display: inline-block;
+.rk-figure-img,
+.rk-figure-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
 }
 
 .rk-shadow {
-  width: 68px;
+  width: 62px;
   height: 12px;
   margin-top: -4px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.4);
   filter: blur(2px);
+}
+.rk-shadow-sm {
+  width: 40px;
+  height: 9px;
 }
 
 .rk-aura {
@@ -116,22 +170,23 @@ body {
   width: 150px;
   height: 150px;
   left: 50%;
-  top: 50%;
-  transform: translate(-50%, -55%);
+  top: 46%;
+  transform: translate(-50%, -50%);
   pointer-events: none;
 }
 
-.rk-name {
+.rk-cname {
   font-size: 12px;
   font-weight: 700;
   text-align: center;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
 }
-.rk-name .rk-sub {
-  font-weight: 400;
-  opacity: 0.7;
+.rk-cname-sm {
+  font-size: 10px;
+  font-weight: 600;
+  opacity: 0.85;
 }
-.rk-tags {
+.rk-ctags {
   font-size: 10px;
   opacity: 0.65;
   text-align: center;
@@ -146,13 +201,13 @@ body {
   background: rgba(251, 191, 36, 0.16);
 }
 
-/* faixa inferior: XP + ouro */
+/* ---- faixa inferior: XP + ouro ---- */
 .rk-strip {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: 10px;
-  z-index: 3;
+  bottom: 8px;
+  z-index: 4;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -196,7 +251,7 @@ body {
 .rk-floaters {
   position: absolute;
   inset: 0;
-  z-index: 4;
+  z-index: 3;
   pointer-events: none;
   overflow: hidden;
 }
@@ -209,12 +264,12 @@ body {
   animation: rk-floatUp 0.95s ease-out forwards;
 }
 .rk-floater-monster {
-  right: 24%;
-  top: 46%;
+  right: 14%;
+  top: 40%;
 }
 .rk-floater-hero {
-  left: 18%;
-  top: 52%;
+  left: 12%;
+  top: 46%;
 }
 .rk-floater-dmg {
   color: #fde047;
@@ -226,19 +281,27 @@ body {
 .rk-floater-info {
   color: #7dd3fc;
   font-size: 13px;
-  top: 30%;
+  top: 26%;
 }
 .rk-floater-level {
   color: #fbbf24;
   font-size: 20px;
-  top: 26%;
+  top: 22%;
 }
 .rk-floater-defeat {
-  font-size: 28px;
-  top: 38%;
+  font-size: 26px;
+  top: 34%;
 }
 
-/* ---- keyframes ---- */
+/* ======================================================================
+   Animações
+   ====================================================================== */
+
+/* wrapper neutro que só serve de alvo pra animação */
+.rk-anim {
+  display: inline-block;
+}
+
 @keyframes rk-floatUp {
   0% {
     opacity: 0;
@@ -250,17 +313,19 @@ body {
   }
   100% {
     opacity: 0;
-    transform: translate(var(--dx, 0), -54px) scale(1);
+    transform: translate(var(--dx, 0), -52px) scale(1);
   }
 }
+
+/* personagem ataca: avança e volta */
 @keyframes rk-swing {
   0% {
     transform: translateX(0);
   }
-  30% {
-    transform: translateX(22px) rotate(-6deg);
+  35% {
+    transform: translateX(24px) rotate(-4deg);
   }
-  55% {
+  60% {
     transform: translateX(12px);
   }
   100% {
@@ -268,58 +333,83 @@ body {
   }
 }
 .rk-swing {
-  animation: rk-swing 0.45s ease;
+  animation: rk-swing 0.42s ease;
 }
-/* o herói está espelhado; o swing precisa empurrar para o lado do monstro */
-.rk-slot-hero .rk-swing {
-  animation-name: rk-swing-hero;
-}
-@keyframes rk-swing-hero {
+
+/* companheiro ataca: pulinho pra frente */
+@keyframes rk-cast {
   0% {
-    transform: scaleX(-1) translateX(0);
+    transform: translate(0, 0);
   }
-  30% {
-    transform: scaleX(-1) translateX(22px) rotate(6deg);
-  }
-  55% {
-    transform: scaleX(-1) translateX(12px);
+  40% {
+    transform: translate(16px, -6px);
+    filter: brightness(1.4);
   }
   100% {
-    transform: scaleX(-1) translateX(0);
+    transform: translate(0, 0);
   }
 }
+.rk-cast {
+  animation: rk-cast 0.38s ease;
+}
+
+/* personagem toma dano: flash */
+@keyframes rk-hurt {
+  0%,
+  100% {
+    filter: none;
+  }
+  25% {
+    filter: brightness(1.5) sepia(1) saturate(6) hue-rotate(-35deg);
+  }
+}
+.rk-hurt {
+  animation: rk-hurt 0.3s ease;
+}
+
+/* monstro toma dano: treme + flash vermelho */
 @keyframes rk-shake {
   0%,
   100% {
     transform: translateX(0);
   }
-  15% {
-    transform: translateX(-7px);
+  20% {
+    transform: translateX(-6px);
   }
-  30% {
-    transform: translateX(6px);
-  }
-  45% {
-    transform: translateX(-5px);
+  40% {
+    transform: translateX(5px);
   }
   60% {
-    transform: translateX(4px);
+    transform: translateX(-4px);
   }
-  75% {
-    transform: translateX(-2px);
+  80% {
+    transform: translateX(3px);
   }
 }
-.rk-shake {
-  animation: rk-shake 0.3s ease;
+@keyframes rk-flash-red {
+  0%,
+  100% {
+    filter: none;
+  }
+  25% {
+    filter: brightness(1.6) sepia(1) saturate(8) hue-rotate(-25deg);
+  }
 }
+.rk-monster-hit {
+  animation:
+    rk-shake 0.3s ease,
+    rk-flash-red 0.28s ease;
+}
+
+/* monstro novo entra deslizando */
 @keyframes rk-enter {
   0% {
     opacity: 0;
-    transform: translateX(52px) scale(0.5);
+    transform: translateX(46px) scale(0.6);
   }
   70% {
     opacity: 1;
-    transform: translateX(-6px) scale(1.06);
+    transform: translateX(-6px) scale(1.05);
   }
   100% {
     transform: translateX(0) scale(1);
@@ -328,31 +418,37 @@ body {
 .rk-enter {
   animation: rk-enter 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-@keyframes rk-hurt {
-  0%,
+
+/* monstro morre: some antes do próximo aparecer */
+@keyframes rk-death {
+  0% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
   100% {
-    filter: none;
-  }
-  30% {
-    filter: brightness(1.5) sepia(1) saturate(6) hue-rotate(-35deg);
+    opacity: 0;
+    transform: scale(0.55) rotate(14deg) translateY(6px);
   }
 }
-.rk-hurt {
-  animation: rk-hurt 0.3s ease;
+.rk-death {
+  animation: rk-death 0.38s ease-in forwards;
 }
+
+/* chefe: brilho pulsante */
 @keyframes rk-glow {
   0%,
   100% {
-    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5))
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45))
       drop-shadow(0 0 2px rgba(251, 191, 36, 0.5));
   }
   50% {
-    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.5))
+    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.45))
       drop-shadow(0 0 16px rgba(251, 191, 36, 0.95));
   }
 }
-.rk-boss {
+.rk-boss .rk-figure {
   animation: rk-glow 1.8s ease-in-out infinite;
+  transform: scale(1.12);
 }
 
 /* revelação simples dos resultados de invocação */
@@ -372,10 +468,12 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .rk-swing,
-  .rk-shake,
+  .rk-cast,
+  .rk-monster-hit,
   .rk-enter,
+  .rk-death,
   .rk-hurt,
-  .rk-boss,
+  .rk-boss .rk-figure,
   .rk-floater,
   .rk-reveal {
     animation: none !important;
@@ -383,5 +481,8 @@ body {
   .rk-floater,
   .rk-reveal {
     opacity: 1;
+  }
+  .rk-death {
+    opacity: 0;
   }
 }

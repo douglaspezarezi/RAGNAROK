@@ -1,8 +1,7 @@
 import type { CSSProperties } from "react";
 
-import type { Monster } from "@game/data";
-
-import { arenaBackground, elementColor } from "@/lib/sprites";
+import { arenaBackground } from "@/lib/sprites";
+import { SpriteFigure, type SpriteFigureProps } from "./SpriteFigure";
 
 export interface Floater {
   id: number;
@@ -13,31 +12,42 @@ export interface Floater {
   dx: number;
 }
 
+/** Um combatente na cena (dados de render — nada de regras). */
+export interface Combatant {
+  sprite: Pick<SpriteFigureProps, "kind" | "id" | "spriteUrl" | "color" | "glyph">;
+  name: string;
+  /** linha abaixo do nome (ex.: "Guerreiro · Nv 12" ou "Nv 4 · Inseto · Terra 1"). */
+  sub?: string;
+  hp?: number;
+  maxHp?: number;
+  sp?: number;
+  maxSp?: number;
+  /** só monstro */
+  isBoss?: boolean;
+  bossRank?: string;
+  /** cor da aura atrás do monstro (por elemento) */
+  auraColor?: string;
+}
+
 export interface BattleArenaProps {
   chapterNumber: number;
   chapterLabel: string;
 
-  heroEmoji: string;
-  heroName: string;
-  heroLine?: string;
-  heroLevel: number;
-  heroHp: number;
-  heroMaxHp: number;
-  heroSp: number;
-  heroMaxSp: number;
+  hero: Combatant;
+  companion: Combatant | null;
+  monster: Combatant;
+  /** monstro em fade-out de morte (mostra o que caiu até o próximo entrar). */
+  monsterDying: boolean;
 
   xp: number;
   xpMax: number;
   gold: number;
 
-  monster: Monster;
-  monsterEmoji: string;
-  monsterHp: number;
-  monsterMaxHp: number;
-
-  /** incrementa a cada tick de combate — força o replay das animações */
+  /** incrementa a cada tick — usado como key para re-disparar animações. */
   fxTick: number;
+  heroAttack: boolean;
   heroHurt: boolean;
+  companionAttack: boolean;
   monsterHit: boolean;
 
   floaters: Floater[];
@@ -60,118 +70,127 @@ function Meter({
   fill: string;
 }) {
   return (
-    <div className="w-full">
-      <div className="flex justify-between text-[10px] font-semibold text-white/80">
+    <div className="rk-meter">
+      <div className="rk-meter-row">
         <span>{label}</span>
         <span>
           {Math.max(0, Math.ceil(value))}/{max}
         </span>
       </div>
-      <div className="mt-0.5 h-2 w-full overflow-hidden rounded-full border border-white/20 bg-black/40">
-        <div
-          className="h-full rounded-full transition-[width] duration-300"
-          style={{ width: `${pct(value, max)}%`, background: fill }}
-        />
+      <div className="rk-meter-track">
+        <div className="rk-meter-fill" style={{ width: `${pct(value, max)}%`, background: fill }} />
       </div>
     </div>
   );
 }
 
-export function BattleArena(props: BattleArenaProps) {
-  const {
-    chapterNumber,
-    chapterLabel,
-    heroEmoji,
-    heroName,
-    heroLine,
-    heroLevel,
-    heroHp,
-    heroMaxHp,
-    heroSp,
-    heroMaxSp,
-    xp,
-    xpMax,
-    gold,
-    monster,
-    monsterEmoji,
-    monsterHp,
-    monsterMaxHp,
-    fxTick,
-    heroHurt,
-    monsterHit,
-    floaters,
-    paused,
-  } = props;
-
+export function BattleArena({
+  chapterNumber,
+  chapterLabel,
+  hero,
+  companion,
+  monster,
+  monsterDying,
+  xp,
+  xpMax,
+  gold,
+  fxTick,
+  heroAttack,
+  heroHurt,
+  companionAttack,
+  monsterHit,
+  floaters,
+  paused,
+}: BattleArenaProps) {
   return (
-    <div
-      className="rk-arena"
-      style={{ background: arenaBackground(chapterNumber) }}
-    >
+    <div className="rk-arena" style={{ background: arenaBackground(chapterNumber) }}>
       <div className="rk-chapter">
         Cap. {chapterNumber} — {chapterLabel}
       </div>
-
       <div className="rk-floor" />
 
-      {/* ---- herói ---- */}
-      <div className="rk-slot rk-slot-hero">
-        <Meter label="HP" value={heroHp} max={heroMaxHp} fill="#22c55e" />
-        <Meter label="SP" value={heroSp} max={heroMaxSp} fill="#38bdf8" />
-        <div className="rk-sprite-wrap">
-          <div key={fxTick} className="rk-sprite rk-swing">
-            <span className={heroHurt ? "rk-hurt" : undefined}>{heroEmoji}</span>
-          </div>
-          <div className="rk-shadow" />
-        </div>
-        <div className="rk-name">
-          {heroName}
-          {heroLine ? <span className="rk-sub"> · {heroLine}</span> : null} · Nv{" "}
-          {heroLevel}
-        </div>
-      </div>
-
-      {/* ---- monstro ---- */}
-      <div className="rk-slot rk-slot-monster">
-        <Meter label="HP" value={monsterHp} max={monsterMaxHp} fill="#ef4444" />
-        <div
-          className={monster.isBoss ? "rk-sprite-wrap rk-boss" : "rk-sprite-wrap"}
-        >
-          <div
-            className="rk-aura"
-            style={{
-              background: `radial-gradient(circle, ${elementColor(
-                monster.element,
-              )}55, transparent 70%)`,
-            }}
-          />
-          <div
-            key={monster.id}
-            className="rk-enter"
-            style={{ transform: monster.isBoss ? "scale(1.25)" : undefined }}
-          >
-            <div
-              key={fxTick}
-              className={monsterHit ? "rk-sprite rk-shake" : "rk-sprite"}
-            >
-              {monsterEmoji}
+      <div className="rk-stage">
+        {/* ---------- grupo do jogador (personagem + companheiro) ---------- */}
+        <div className="rk-party">
+          {companion ? (
+            <div className="rk-combatant rk-combatant-companion">
+              <div className="rk-figure-wrap">
+                <div
+                  key={fxTick}
+                  className={companionAttack ? "rk-anim rk-cast" : "rk-anim"}
+                >
+                  <SpriteFigure {...companion.sprite} size={54} flip title={companion.name} />
+                </div>
+                <div className="rk-shadow rk-shadow-sm" />
+              </div>
+              <div className="rk-cname rk-cname-sm" title={companion.sub}>
+                {companion.name}
+              </div>
             </div>
-          </div>
-          <div className="rk-shadow" />
-        </div>
-        <div className="rk-name">
-          {monster.name} · Nv {monster.level}
-          {monster.isBoss ? (
-            <span className="rk-badge">{monster.bossRank}</span>
           ) : null}
+
+          <div className="rk-combatant rk-combatant-hero">
+            <div className="rk-bars">
+              <Meter label="HP" value={hero.hp ?? 0} max={hero.maxHp ?? 1} fill="#22c55e" />
+              <Meter label="SP" value={hero.sp ?? 0} max={hero.maxSp ?? 1} fill="#38bdf8" />
+            </div>
+            <div className="rk-figure-wrap">
+              <div
+                key={fxTick}
+                className={heroAttack ? "rk-anim rk-swing" : "rk-anim"}
+              >
+                <div className={heroHurt ? "rk-anim rk-hurt" : "rk-anim"}>
+                  <SpriteFigure {...hero.sprite} size={92} flip title={hero.name} />
+                </div>
+              </div>
+              <div className="rk-shadow" />
+            </div>
+            <div className="rk-cname">{hero.name}</div>
+            {hero.sub ? <div className="rk-ctags">{hero.sub}</div> : null}
+          </div>
         </div>
-        <div className="rk-tags">
-          {monster.race} · {monster.element} {monster.elementLevel} ·{" "}
-          {monster.size}
+
+        {/* ---------- monstro ---------- */}
+        <div className={`rk-combatant rk-combatant-monster ${monster.isBoss ? "rk-boss" : ""}`}>
+          <div className="rk-bars">
+            <Meter
+              label="HP"
+              value={monster.hp ?? 0}
+              max={monster.maxHp ?? 1}
+              fill="#ef4444"
+            />
+          </div>
+          <div className="rk-figure-wrap">
+            <div
+              className="rk-aura"
+              style={{
+                background: `radial-gradient(circle, ${monster.auraColor ?? "#9ca3af"}55, transparent 70%)`,
+              }}
+            />
+            <div
+              key={monster.sprite.id}
+              className={monsterDying ? "rk-anim rk-death" : "rk-anim rk-enter"}
+            >
+              <div
+                key={fxTick}
+                className={monsterHit ? "rk-anim rk-monster-hit" : "rk-anim"}
+              >
+                <SpriteFigure {...monster.sprite} size={96} title={monster.name} />
+              </div>
+            </div>
+            <div className="rk-shadow" />
+          </div>
+          <div className="rk-cname">
+            {monster.name}
+            {monster.isBoss && monster.bossRank ? (
+              <span className="rk-badge">{monster.bossRank}</span>
+            ) : null}
+          </div>
+          {monster.sub ? <div className="rk-ctags">{monster.sub}</div> : null}
         </div>
       </div>
 
-      {/* ---- números flutuantes ---- */}
+      {/* ---------- números flutuantes ---------- */}
       <div className="rk-floaters">
         {floaters.map((f) => (
           <span
@@ -186,7 +205,7 @@ export function BattleArena(props: BattleArenaProps) {
         ))}
       </div>
 
-      {/* ---- faixa inferior: XP + ouro ---- */}
+      {/* ---------- faixa inferior: XP + ouro ---------- */}
       <div className="rk-strip">
         <span className="rk-strip-label">XP</span>
         <div className="rk-xpbar">

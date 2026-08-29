@@ -1,33 +1,92 @@
 /**
- * Camada de apresentação: "sprites" placeholder (emoji) e temas de cenário.
+ * Camada de apresentação da cena de combate — placeholders originais.
  *
- * Nada de arte final aqui — só o suficiente para a cena de batalha ter cara de
- * jogo. Trocar por spritesheets/arte depois é só mexer neste arquivo.
+ * NENHUMA arte real aqui. Enquanto não há sprites, cada combatente é desenhado
+ * como uma FORMA + COR simples (SVG/CSS):
+ *   - monstro    → círculo, cor por RAÇA
+ *   - personagem → cápsula arredondada, cor por LINHA DE CLASSE
+ *   - companheiro→ losango, cor por TIER
+ * Um pequeno glifo (emoji do sistema — não é asset do projeto) vai dentro só
+ * para leitura rápida.
+ *
+ * Quando a arte existir, `SpriteFigure` carrega a imagem real e este arquivo
+ * só serve de fallback. Ver `public/sprites/README.md`.
  */
 
-import type { ClassLine, Monster, MonsterElement, MonsterRace } from "@game/data";
+import type {
+  ClassLine,
+  CompanionTier,
+  MonsterElement,
+  MonsterRace,
+} from "@game/data";
 
-/** Emoji do herói pela linha de classe. */
-export function heroSprite(line: ClassLine | undefined): string {
-  switch (line) {
-    case "Guerreiro":
-      return "🤺";
-    case "Arcanista":
-      return "🧙";
-    case "Caçador":
-      return "🏹";
-    case "Infiltrador":
-      return "🥷";
-    case "Mercador":
-      return "🧑‍🔧";
-    case "Acólito":
-      return "🧑‍⚕️";
-    default:
-      return "🧑";
-  }
+/* -------------------------------------------------------------------------- */
+/*  Convenção de caminho dos sprites reais                                     */
+/* -------------------------------------------------------------------------- */
+
+export type SpriteKind = "character" | "monster" | "companion";
+
+const SPRITE_DIR: Record<SpriteKind, string> = {
+  character: "/sprites/characters",
+  monster: "/sprites/monsters",
+  companion: "/sprites/companions",
+};
+
+/** Caminho padrão de um sprite: `/sprites/<pasta>/<id>.png`. */
+export function spritePath(kind: SpriteKind, id: string): string {
+  return `${SPRITE_DIR[kind]}/${id}.png`;
 }
 
-const RACE_EMOJI: Record<MonsterRace, string> = {
+/* -------------------------------------------------------------------------- */
+/*  Cores dos placeholders                                                     */
+/* -------------------------------------------------------------------------- */
+
+/** Cor do placeholder do monstro, por raça (tabela raça→cor). */
+export const RACE_PLACEHOLDER_COLOR: Record<MonsterRace, string> = {
+  Planta: "#4ade80", // verde
+  Bruto: "#b45309", // castanho-alaranjado
+  Inseto: "#92400e", // marrom
+  Anfíbio: "#2dd4bf", // verde-água
+  Amorfo: "#67e8f9", // ciano claro (gosma)
+  "Morto-vivo": "#9ca3af", // cinza
+  Demônio: "#a855f7", // roxo
+  Peixe: "#3b82f6", // azul
+  Dragão: "#ef4444", // vermelho
+};
+
+/** Cor do placeholder do personagem, por linha de classe. */
+export const CLASS_PLACEHOLDER_COLOR: Record<ClassLine, string> = {
+  Guerreiro: "#dc2626",
+  Arcanista: "#2563eb",
+  Caçador: "#16a34a",
+  Infiltrador: "#7c3aed",
+  Mercador: "#d97706",
+  Acólito: "#ca8a04",
+};
+
+/** Cor do placeholder do companheiro, por tier. */
+export const COMPANION_PLACEHOLDER_COLOR: Record<CompanionTier, string> = {
+  S: "#f59e0b",
+  A: "#a855f7",
+  B: "#3b82f6",
+  C: "#9ca3af",
+};
+
+export function racePlaceholderColor(race: MonsterRace): string {
+  return RACE_PLACEHOLDER_COLOR[race] ?? "#9ca3af";
+}
+export function classPlaceholderColor(line: ClassLine | undefined): string {
+  return line ? (CLASS_PLACEHOLDER_COLOR[line] ?? "#64748b") : "#64748b";
+}
+export function companionPlaceholderColor(tier: CompanionTier): string {
+  return COMPANION_PLACEHOLDER_COLOR[tier] ?? "#9ca3af";
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Glifos (emoji do sistema — legibilidade, não são arte do projeto)         */
+/* -------------------------------------------------------------------------- */
+
+const RACE_GLYPH: Record<MonsterRace, string> = {
   Planta: "🌿",
   Bruto: "🐗",
   Inseto: "🐛",
@@ -39,10 +98,29 @@ const RACE_EMOJI: Record<MonsterRace, string> = {
   Dragão: "🐉",
 };
 
-/** Emoji do monstro pela raça. */
-export function monsterSprite(monster: Monster): string {
-  return RACE_EMOJI[monster.race] ?? "❓";
+const CLASS_GLYPH: Record<ClassLine, string> = {
+  Guerreiro: "🛡️",
+  Arcanista: "🔮",
+  Caçador: "🏹",
+  Infiltrador: "🗡️",
+  Mercador: "⚙️",
+  Acólito: "✨",
+};
+
+export function raceGlyph(race: MonsterRace): string {
+  return RACE_GLYPH[race] ?? "❓";
 }
+export function classGlyph(line: ClassLine | undefined): string {
+  return line ? (CLASS_GLYPH[line] ?? "🙂") : "🙂";
+}
+/** Companheiro: a letra do tier já comunica bem. */
+export function companionGlyph(tier: CompanionTier): string {
+  return tier;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Cenário por capítulo                                                       */
+/* -------------------------------------------------------------------------- */
 
 const ELEMENT_COLOR: Record<MonsterElement, string> = {
   Neutro: "#9ca3af",
@@ -73,7 +151,10 @@ const CHAPTER_TINT: Record<number, string> = {
   10: "#6366f1", // navio
 };
 
-/** Fundo da arena: palco escuro com um brilho colorido no topo por capítulo. */
+/**
+ * Fundo da arena: palco escuro com um brilho colorido no topo por capítulo.
+ * Placeholder — troque por uma imagem em `sprites/` (ver README) quando houver.
+ */
 export function arenaBackground(chapterNumber: number): string {
   const tint = CHAPTER_TINT[chapterNumber] ?? "#64748b";
   return (
