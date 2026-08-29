@@ -380,6 +380,31 @@ export function applyRebirthToSave(save: GameSave): {
   }
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Recompensa exclusiva (eventos temporários)                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Concede a posse de um Companheiro/Selo (recompensa exclusiva de evento).
+ * A existência da chave no mapa = "possui o item" (mesmo com 0 fragmentos),
+ * seguindo o padrão do gacha. Idempotente e sem mutação.
+ */
+export function applyGrantItem(
+  save: GameSave,
+  kind: "companion" | "seal",
+  id: string,
+): GameSave {
+  if (kind === "companion") {
+    if (id in save.companionFragments) return save;
+    return {
+      ...save,
+      companionFragments: { ...save.companionFragments, [id]: 0 },
+    };
+  }
+  if (id in save.sealFragments) return save;
+  return { ...save, sealFragments: { ...save.sealFragments, [id]: 0 } };
+}
+
 /** Aplica o resumo de progresso offline (`@game/core`) ao save. Não muta. */
 export function applyOfflineRewards(
   save: GameSave,

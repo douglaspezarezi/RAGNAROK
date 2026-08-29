@@ -13,10 +13,12 @@ import type { OfflineRewardsSummary } from "@game/core";
 
 import {
   createInitialCharacter,
+  createInitialSave,
   INITIAL_SUMMON_CRYSTALS,
   type GameSave,
   SAVE_VERSION,
 } from "./gameSave";
+import { upsertLeaderboardStage } from "./leaderboard";
 import { getSupabase } from "./supabase/client";
 import type {
   CharacterProgress,
@@ -312,6 +314,9 @@ export async function saveBundle(
       toast.error("Erro ao salvar progresso. Tentando de novo em breve.");
       return false;
     }
+
+    // "fotografia" para o Ranking de Estágio — mesmo momento do save, best-effort.
+    void upsertLeaderboardStage(target.playerId, save);
     return true;
   } catch (e) {
     logError("saveBundle.throw", e);
@@ -418,6 +423,9 @@ export async function resetCharacter(target: SaveTarget): Promise<boolean> {
       toast.error("Erro ao reiniciar o personagem.");
       return false;
     }
+
+    // reflete o reset no Ranking de Estágio
+    void upsertLeaderboardStage(target.playerId, createInitialSave());
     return true;
   } catch (e) {
     logError("resetCharacter.throw", e);

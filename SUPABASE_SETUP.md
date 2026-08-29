@@ -10,9 +10,10 @@ Supabase real. ~10 minutos.
 
 ## 2. Rodar as migrations (cria tabelas + RLS + trigger + colunas do gacha)
 
-**Rode as duas, em ordem:**
+**Rode as três, em ordem:**
 1. [`supabase/migrations/20260829120000_init_game_schema.sql`](supabase/migrations/20260829120000_init_game_schema.sql) — tabelas + RLS + trigger.
 2. [`supabase/migrations/20260829130000_gacha_equipment_rebirth.sql`](supabase/migrations/20260829130000_gacha_equipment_rebirth.sql) — 3 colunas novas em `characters`: `equipped_seals`, `summon_crystals`, `summon_pity`.
+3. [`supabase/migrations/20260829140000_events_and_rankings.sql`](supabase/migrations/20260829140000_events_and_rankings.sql) — Eventos Temporários + Rankings (`events`, `player_event_progress`, `leaderboard_stage`, `weekly_boss`, `weekly_boss_attempts`) + RLS. O fim do arquivo tem um bloco de **seed de teste** comentado.
 
 **Opção A — SQL Editor (mais rápido):**
 Dashboard → **SQL Editor** → **New query** → cole o conteúdo de cada arquivo → **Run** (uma vez cada).
@@ -88,6 +89,96 @@ variáveis, o app abre numa tela explicando o que falta em vez de quebrar.
 8. **Renascer**: só aparece no topo da tela de Combate quando `canRebirth` é
    `true` (nível ≥ 100 **ou** capítulo ≥ 8 concluído). O modal mostra o que
    perde/mantém e o multiplicador antes/depois.
+
+## 6. Eventos e Rankings (GDD 8.5)
+
+Três telas novas no topo: **Eventos**, **Ranking**, **Chefe da Semana**. Tudo
+assíncrono — nenhuma exige outro jogador online.
+
+### Ranking de Estágio — não precisa de setup
+
+`leaderboard_stage` se popula sozinho: cada vez que o personagem salva (autosave
+de ~10s, subir de nível, avançar estágio), o app grava/atualiza a linha do
+jogador. Abra **Combate** com uma conta e depois **Ranking**. `progress_index` é
+a posição do estágio atual numa ordem canônica (capítulo → nível → comum antes
+de chefe); maior = mais avançado. Quem não está no top 100 vê "Sua posição: #X"
+abaixo da lista.
+
+> Rival fake: `insert into leaderboard_stage (player_id, character_name, job_id,
+> progress_index, level) values ('<player_id real>', 'Sentinela', 'sentinela',
+> 25, 60) on conflict (player_id) do update set progress_index = 25, level = 60;`
+> (o `player_id` precisa existir em `public.players`).
+
+### Definir um EVENTO de teste
+
+SQL Editor → cole (ajuste datas/ids conforme quiser):
+
+```sql
+-- Caso A: reaproveita um capítulo do bestiário, monstros 1.5x de nível
+insert into public.events
+  (name, description, stage_override, starts_at, ends_at,
+   exclusive_reward_type, exclusive_reward_id, completion_goal)
+values
+  ('Festival da Copa Sussurrante',
+   'Estágio sazonal nas Florestas de Sylmere com monstros reforçados.',
+   '{"chapterNumber": 3, "levelMultiplier": 1.5}'::jsonb,
+   now() - interval '1 hour', now() + interval '3 days',
+   'companion', 'coruja-sabia', 50);
+```
+
+```sql
+-- Caso B: conjunto PRÓPRIO de monstros (cada um usa um id do bestiário de molde)
+insert into public.events
+  (name, description, stage_override, starts_at, ends_at,
+   exclusive_reward_type, exclusive_reward_id, completion_goal)
+values
+  ('Incursão Relâmpago',
+   'Alvos especiais em série. Recompensa: um Selo exclusivo.',
+   '{"levelMultiplier": 2, "monsters": [
+      {"baseId": "gotinha", "name": "Gotinha Relâmpago", "level": 30},
+      {"baseId": "coelhal", "name": "Coelhal Relâmpago", "level": 35},
+      {"baseId": "broteiro", "name": "Broteiro Relâmpago", "level": 40}
+    ]}'::jsonb,
+   now() - interval '1 hour', now() + interval '2 days',
+   'seal', 'selo-do-coelhal', 40);
+```
+
+Campos:
+- `stage_override` — `{"chapterNumber": N}` **ou** `{"monsters": [...]}`;
+  `levelMultiplier` (opcional) escala o nível efetivo (afeta HP/ATQ).
+- `exclusive_reward_type` — `'companion'` ou `'seal'`; `exclusive_reward_id` é um
+  id de `packages/game-data/src/companions.ts` / `battleSeals.ts`.
+- `completion_goal` — critério: "derrote N monstros do evento".
+- Para desativar: `update events set is_active = false where id = '...';` ou
+  deixe `ends_at` no passado.
+
+Na tela **Eventos**: aparece nome, descrição, recompensa, contador regressivo e
+barra `kills / meta`. **Participar** roda o combate (mesmas regras da campanha) e
+grava o progresso a cada 5 kills e ao sair. Ao bater a meta, o botão **Resgatar
+recompensa exclusiva** entrega o Companheiro/Selo (aparece em Equipar/Invocar) e
+marca `reward_claimed`.
+
+### Definir o CHEFE DA SEMANA de teste
+
+```sql
+insert into public.weekly_boss
+  (monster_id, week_start, week_end, boosted_stats_multiplier)
+values
+  ('reflexo-sombrio', now() - interval '1 hour', now() + interval '7 days', 4);
+```
+
+- `monster_id` — um MVP de `bestiary.ts` (ex.: `reflexo-sombrio`,
+  `general-esquecido`, `rei-do-areal-eterno`, `capitao-amaldicoado`,
+  `serpente-das-profundezas`).
+- `boosted_stats_multiplier` — reforço de HP/ATQ/DEF (aplicado elevando o nível
+  efetivo do monstro; não toca `@game/core`).
+- Para trocar de chefe: `update weekly_boss set is_active = false where id='...';`
+  e insira outro.
+
+Na tela **Chefe da Semana**: mostra o chefe, HP/ATQ reforçados e contador. **Tentar
+agora** simula 60s de combate (via `simulateCombatTick`), registra o dano em
+`weekly_boss_attempts` e atualiza o ranking (maior dano por jogador). Limite:
+**3 tentativas por dia** (contadas no cliente a partir de `attempted_at`).
 
 ## Como auditar depois
 

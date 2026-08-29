@@ -60,3 +60,80 @@ export interface PlayerSealRow {
   fragments: number;
   upgrade_level: number;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Eventos Temporários + Rankings (migration 20260829140000)                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `events.stage_override` (jsonb). Flexível para dois casos:
+ *  - reaproveitar um capítulo do bestiário: `{ chapterNumber }`
+ *  - conjunto próprio: `{ monsters: [{ baseId, name?, level?, isBoss?, bossRank? }] }`
+ * `levelMultiplier` (opcional) escala o nível efetivo dos monstros do evento.
+ */
+export interface EventStageOverride {
+  chapterNumber?: number;
+  monsters?: {
+    /** id de um monstro do bestiary.ts usado como molde. */
+    baseId: string;
+    name?: string;
+    level?: number;
+    isBoss?: boolean;
+    bossRank?: "Mini" | "MVP";
+  }[];
+  levelMultiplier?: number;
+}
+
+export interface EventRow {
+  id: string;
+  name: string;
+  description: string;
+  stage_override: EventStageOverride;
+  starts_at: string;
+  ends_at: string;
+  exclusive_reward_type: "companion" | "seal";
+  exclusive_reward_id: string;
+  completion_goal: number;
+  is_active: boolean;
+}
+
+export interface EventProgressData {
+  kills?: number;
+  damage?: number;
+}
+
+export interface PlayerEventProgressRow {
+  id: string;
+  player_id: string;
+  event_id: string;
+  progress_data: EventProgressData;
+  reward_claimed: boolean;
+  updated_at: string;
+}
+
+export interface LeaderboardStageRow {
+  player_id: string;
+  character_name: string;
+  job_id: string;
+  progress_index: number;
+  level: number;
+  updated_at: string;
+}
+
+export interface WeeklyBossRow {
+  id: string;
+  monster_id: string;
+  week_start: string;
+  week_end: string;
+  boosted_stats_multiplier: number;
+  is_active: boolean;
+}
+
+export interface WeeklyBossAttemptRow {
+  id: string;
+  player_id: string;
+  weekly_boss_id: string;
+  character_name: string;
+  damage_dealt: number;
+  attempted_at: string;
+}

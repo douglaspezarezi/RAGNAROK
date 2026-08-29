@@ -30,6 +30,7 @@ import {
 import {
   applyAdvanceStage,
   applyEquip,
+  applyGrantItem,
   applyKill,
   applyOfflineRewards,
   applyRebirthToSave,
@@ -414,6 +415,32 @@ export async function performSummon(
     return { ok: false, error: "Falha ao salvar a invocação. Tente de novo." };
   }
   return { ok: true, results };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Recompensa exclusiva de evento                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Concede um Companheiro/Selo exclusivo ao save e PERSISTE antes de devolver
+ * `true`. Idempotente (re-conceder o mesmo item é sem-op). Rollback em memória
+ * se o save falhar.
+ */
+export async function grantExclusiveReward(
+  kind: "companion" | "seal",
+  id: string,
+): Promise<boolean> {
+  if (!clientState) return false;
+  const prev = clientState;
+  const next = applyGrantItem(prev, kind, id);
+  if (next === prev) return true; // já possui — nada a persistir
+  commit(next);
+  const saved = await persistNowChecked();
+  if (!saved) {
+    commit(prev);
+    return false;
+  }
+  return true;
 }
 
 /* -------------------------------------------------------------------------- */

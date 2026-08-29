@@ -30,6 +30,9 @@ const NAV = [
   { href: "/", label: "Combate" },
   { href: "/equipment", label: "Equipar" },
   { href: "/summon", label: "Invocar" },
+  { href: "/events", label: "Eventos" },
+  { href: "/leaderboard", label: "Ranking" },
+  { href: "/weekly-boss", label: "Chefe da Semana" },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
