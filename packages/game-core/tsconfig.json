@@ -18,5 +18,5 @@
       "@game/data": ["../game-data/src/index.ts"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "scripts"]
 }
