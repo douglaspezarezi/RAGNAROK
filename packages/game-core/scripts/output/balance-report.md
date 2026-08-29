@@ -1,14 +1,14 @@
 # Relatório de balanceamento — RAGNAROK
 
-Gerado em 2026-08-29T17:41:47.408Z · `npm run simulate` (packages/game-core)
+Gerado em 2026-08-29T17:45:45.670Z · `npm run simulate` (packages/game-core)
 
 > Combate/recompensas/offline/gacha vêm de **@game/core** (inalterados). Curva de XP, ganho de atributo por nível e builds por classe são **premissas do harness** (marcadas abaixo).
 
 ## Leitura rápida (observações, não recomendações)
 
-- **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 51m–3h 35m** de jogo simulado, terminando entre **Nv 49 e Nv 70**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
-- **Dispersão entre classes: 1.9×** (mais rápida `Guerreiro` 1h 51m · mais lenta `Infiltrador` 3h 35m). Builds concentradas num stat de dano (FOR ou DES) são as mais rápidas; builds que investem pesado fora de dano — Mercador em VIT/INT, Infiltrador em SOR/AGI — demoram mais porque parte dos pontos não vira dano. Nenhuma classe travou numa parede.
-- **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **14× a 34×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **27–37** no total.
+- **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 51m–2h 50m** de jogo simulado, terminando entre **Nv 49 e Nv 63**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
+- **Dispersão entre classes: 1.5×** (mais rápida `Guerreiro` 1h 51m · mais lenta `Mercador` 2h 50m). Builds concentradas num stat de dano (FOR, DES ou AGI) são as mais rápidas; a mais lenta (Mercador) investe 40% em VIT + 40% em INT, então metade dos pontos não vira dano. Nenhuma classe travou numa parede.
+- **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **14× a 34×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **27–34** no total.
 - **Offline rende 70% do jogo ativo em média** (faixa 70–70%), alvo `OFFLINE_EFFICIENCY_FACTOR` = **70%**. Calibrado: o offline deriva kills/h do DPS real do personagem, então a razão fica ≈ 70% em qualquer estágio (antes usava taxa fixa `f(nível)` e variava de ~60% a ~125%).
 - **Gacha saudável.** Distribuição por tier a ≤ **0.64 p.p.** do nominal; pity respeitado (gap máximo entre Tier S = **61**, teto teórico 61). Poucos S vêm da garantia de pity — a maioria sai no sorteio.
 
@@ -59,7 +59,7 @@ Gerado em 2026-08-29T17:41:47.408Z · `npm run simulate` (packages/game-core)
 | Guerreiro | Recruta | 0.5 | 0.2 | 0.3 | 0 | 0 | 0 |
 | Arcanista | Aprendiz | 0 | 0 | 0.2 | 0.6 | 0.2 | 0 |
 | Caçador | Batedor | 0.2 | 0.3 | 0 | 0 | 0.5 | 0 |
-| Infiltrador | Ladino | 0.3 | 0.35 | 0 | 0 | 0 | 0.35 |
+| Infiltrador | Ladino | 0.4 | 0.6 | 0 | 0 | 0 | 0 |
 | Mercador | Negociante | 0 | 0 | 0.4 | 0.4 | 0.2 | 0 |
 | Acólito | Noviço | 0.6 | 0 | 0.3 | 0.1 | 0 | 0 |
 
@@ -74,11 +74,11 @@ Gerado em 2026-08-29T17:41:47.408Z · `npm run simulate` (packages/game-core)
 | Guerreiro | 49 | 10 / 10 | 1h 51m | 27 | concluiu os 10 capítulos |
 | Arcanista | 58 | 10 / 10 | 2h 23m | 30 | concluiu os 10 capítulos |
 | Caçador | 63 | 10 / 10 | 2h 9m | 34 | concluiu os 10 capítulos |
-| Infiltrador | 70 | 10 / 10 | 3h 35m | 37 | concluiu os 10 capítulos |
+| Infiltrador | 59 | 10 / 10 | 2h | 34 | concluiu os 10 capítulos |
 | Mercador | 53 | 10 / 10 | 2h 50m | 32 | concluiu os 10 capítulos |
 | Acólito | 55 | 10 / 10 | 2h 28m | 29 | concluiu os 10 capítulos |
 
-**Dispersão entre classes:** mais rápida = `Guerreiro` (1h 51m), mais lenta = `Infiltrador` (3h 35m) → **1.9×**. Um fator próximo de 1× indica classes parelhas; acima de ~2× já é candidato a ajuste.
+**Dispersão entre classes:** mais rápida = `Guerreiro` (1h 51m), mais lenta = `Mercador` (2h 50m) → **1.5×**. Um fator próximo de 1× indica classes parelhas; acima de ~2× já é candidato a ajuste.
 
 ### Detalhe por capítulo
 
@@ -131,16 +131,16 @@ Gerado em 2026-08-29T17:41:47.408Z · `npm run simulate` (packages/game-core)
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 11s | 4 | 0 | 11 | 24.3× |  |
-| 2 | Esgotos de Aurelis | 3 | 14 | 11m 2s | 13 | 167 | 173 | 30.4× |  |
-| 3 | Florestas de Sylmere | 14 | 24 | 21m 19s | 5 | 266 | 272 | 26.9× |  |
-| 4 | Torre Arcana | 24 | 31 | 20m 14s | 4 | 233 | 239 | 26.1× |  |
-| 5 | Colinas de Kaeshin | 31 | 37 | 20m 4s | 2 | 242 | 247 | 23.4× |  |
-| 6 | Caverna de Kaeshin | 37 | 43 | 22m 14s | 2 | 277 | 282 | 24.8× |  |
-| 7 | Dunas de Zahkar | 43 | 51 | 32m 18s | 2 | 437 | 442 | 24.6× |  |
-| 8 | Pirâmide Esquecida | 51 | 59 | 35m 12s | 2 | 490 | 495 | 26.8× |  |
-| 9 | Costa de Ventomar | 59 | 70 | 51m 49s | 2 | 787 | 792 | 28.6× |  |
-| 10 | Navio Naufragado | 70 | 70 | 18s | 1 | 0 | 4 | 27.7× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 8s | 4 | 0 | 11 | 23.9× |  |
+| 2 | Esgotos de Aurelis | 3 | 12 | 6m 55s | 10 | 107 | 113 | 29.3× |  |
+| 3 | Florestas de Sylmere | 12 | 20 | 11m 40s | 5 | 153 | 159 | 28.0× |  |
+| 4 | Torre Arcana | 20 | 26 | 11m 29s | 4 | 141 | 147 | 27.9× |  |
+| 5 | Colinas de Kaeshin | 26 | 31 | 10m 57s | 2 | 143 | 148 | 25.0× |  |
+| 6 | Caverna de Kaeshin | 31 | 35 | 9m 34s | 2 | 125 | 130 | 26.6× |  |
+| 7 | Dunas de Zahkar | 35 | 43 | 20m 51s | 2 | 305 | 310 | 27.4× |  |
+| 8 | Pirâmide Esquecida | 43 | 49 | 17m 3s | 2 | 258 | 263 | 28.8× |  |
+| 9 | Costa de Ventomar | 49 | 59 | 30m 31s | 2 | 506 | 511 | 31.3× |  |
+| 10 | Navio Naufragado | 59 | 59 | 16s | 1 | 0 | 4 | 29.8× |  |
 
 #### Mercador
 

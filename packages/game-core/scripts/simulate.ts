@@ -112,9 +112,10 @@ const XP_FORMULA_TEXT = "floor(50 + 25*nível + 5*nível²)  (réplica de apps/w
 /**
  * Builds "padrão" por linha de classe — pesos de alocação dos POINTS_PER_LEVEL
  * pontos ganhos a cada nível. Refletem a fantasia da classe (GDD §3).
- * Em geral NÃO são calibradas para equilibrar; exceção: o Acólito foi ajustado
- * para concentrar mais em dano (FOR, caminho Monge/Mestre Marcial) em vez de
- * pulverizar entre FOR/INT/VIT — antes: FOR 0.3 / VIT 0.4 / INT 0.3.
+ * Em geral NÃO são calibradas para equilibrar; exceções ajustadas para
+ * concentrar em dano (o SOR/INT não pagava no modelo de valor esperado):
+ *   - Acólito:     antes FOR 0.3 / VIT 0.4 / INT 0.3  → foco em FOR (Monge)
+ *   - Infiltrador: antes FOR 0.3 / AGI 0.35 / SOR 0.35 → foco em AGI/FOR (assassino veloz)
  * Atributos: FOR=dano físico, AGI=aspd/esquiva, VIT=HP/regen/def,
  * INT=dano mágico, DES=acerto/dano à distância, SOR=crítico.
  */
@@ -122,7 +123,7 @@ const CLASS_BUILDS: Record<ClassLine, Record<Attribute, number>> = {
   Guerreiro: { FOR: 0.5, AGI: 0.2, VIT: 0.3, INT: 0, DES: 0, SOR: 0 },
   Arcanista: { FOR: 0, AGI: 0, VIT: 0.2, INT: 0.6, DES: 0.2, SOR: 0 },
   Caçador: { FOR: 0.2, AGI: 0.3, VIT: 0, INT: 0, DES: 0.5, SOR: 0 },
-  Infiltrador: { FOR: 0.3, AGI: 0.35, VIT: 0, INT: 0, DES: 0, SOR: 0.35 },
+  Infiltrador: { FOR: 0.4, AGI: 0.6, VIT: 0, INT: 0, DES: 0, SOR: 0 },
   Mercador: { FOR: 0, AGI: 0, VIT: 0.4, INT: 0.4, DES: 0.2, SOR: 0 },
   Acólito: { FOR: 0.6, AGI: 0, VIT: 0.3, INT: 0.1, DES: 0, SOR: 0 },
 };
@@ -718,8 +719,8 @@ function buildReport(
       `- **Dispersão entre classes: ${disp.toFixed(1)}×** (mais rápida \`${fast[0]!.line}\` ` +
         `${fmtDuration(fast[0]!.totalSeconds)} · mais lenta \`${fast[fast.length - 1]!.line}\` ` +
         `${fmtDuration(fast[fast.length - 1]!.totalSeconds)}). Builds concentradas num stat de dano ` +
-        `(FOR ou DES) são as mais rápidas; builds que investem pesado fora de dano — Mercador em ` +
-        `VIT/INT, Infiltrador em SOR/AGI — demoram mais porque parte dos pontos não vira dano. ` +
+        `(FOR, DES ou AGI) são as mais rápidas; a mais lenta (Mercador) investe 40% em VIT + 40% ` +
+        `em INT, então metade dos pontos não vira dano. ` +
         `${anyWall ? "Alguma classe bateu numa parede — ver Seção 1." : "Nenhuma classe travou numa parede."}`,
     );
     p(
