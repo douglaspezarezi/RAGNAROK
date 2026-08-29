@@ -1,14 +1,14 @@
 # Relatório de balanceamento — RAGNAROK
 
-Gerado em 2026-08-29T17:38:15.424Z · `npm run simulate` (packages/game-core)
+Gerado em 2026-08-29T17:41:47.408Z · `npm run simulate` (packages/game-core)
 
 > Combate/recompensas/offline/gacha vêm de **@game/core** (inalterados). Curva de XP, ganho de atributo por nível e builds por classe são **premissas do harness** (marcadas abaixo).
 
 ## Leitura rápida (observações, não recomendações)
 
-- **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 51m–5h 43m** de jogo simulado, terminando entre **Nv 49 e Nv 70**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
-- **Dispersão entre classes: 3.1×** (mais rápida `Guerreiro` 1h 51m · mais lenta `Acólito` 5h 43m). Builds concentradas em dano (FOR ou DES) são as mais rápidas; builds que pulverizam pontos em VIT/INT (Acólito, Mercador) demoram mais porque parte do investimento não vira dano. Nenhuma classe travou numa parede.
-- **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **11× a 34×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **27–37** no total.
+- **Progressão rápida demais em relação à curva de nível.** Todas as 6 classes concluem os 10 capítulos em **1h 51m–3h 35m** de jogo simulado, terminando entre **Nv 49 e Nv 70**. O critério "Nv 150" nunca é atingido: os capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim (Cap. 9–10 têm monstros Nv 100–150).
+- **Dispersão entre classes: 1.9×** (mais rápida `Guerreiro` 1h 51m · mais lenta `Infiltrador` 3h 35m). Builds concentradas num stat de dano (FOR ou DES) são as mais rápidas; builds que investem pesado fora de dano — Mercador em VIT/INT, Infiltrador em SOR/AGI — demoram mais porque parte dos pontos não vira dano. Nenhuma classe travou numa parede.
+- **HP nunca se sustenta sozinho.** Em todos os capítulos de todas as classes o `dano recebido/s` supera o `regen de HP/s` (razões de **14× a 34×**). A sobrevivência depende 100% do heal ao matar; sem ele o personagem morreria em quase todo monstro. Mortes reais (morrer antes de matar) por classe: **27–37** no total.
 - **Offline rende 70% do jogo ativo em média** (faixa 70–70%), alvo `OFFLINE_EFFICIENCY_FACTOR` = **70%**. Calibrado: o offline deriva kills/h do DPS real do personagem, então a razão fica ≈ 70% em qualquer estágio (antes usava taxa fixa `f(nível)` e variava de ~60% a ~125%).
 - **Gacha saudável.** Distribuição por tier a ≤ **0.64 p.p.** do nominal; pity respeitado (gap máximo entre Tier S = **61**, teto teórico 61). Poucos S vêm da garantia de pity — a maioria sai no sorteio.
 
@@ -61,7 +61,7 @@ Gerado em 2026-08-29T17:38:15.424Z · `npm run simulate` (packages/game-core)
 | Caçador | Batedor | 0.2 | 0.3 | 0 | 0 | 0.5 | 0 |
 | Infiltrador | Ladino | 0.3 | 0.35 | 0 | 0 | 0 | 0.35 |
 | Mercador | Negociante | 0 | 0 | 0.4 | 0.4 | 0.2 | 0 |
-| Acólito | Noviço | 0.3 | 0 | 0.4 | 0.3 | 0 | 0 |
+| Acólito | Noviço | 0.6 | 0 | 0.3 | 0.1 | 0 | 0 |
 
 > Nota do modelo: o combate resolve dano físico por `ATK_PER_FOR·FOR + ATK_PER_DES·DES` (FOR vale 4× DES por ponto) e mágico por `MATK_PER_INT·INT`. `attackType` é mágico quando INT efetivo > FOR efetivo. Os jobs base (tier 1) não têm `attributeFocus`, então a linha de classe só influencia via `attackType` — toda a diferença entre classes vem da build de atributos.
 
@@ -76,9 +76,9 @@ Gerado em 2026-08-29T17:38:15.424Z · `npm run simulate` (packages/game-core)
 | Caçador | 63 | 10 / 10 | 2h 9m | 34 | concluiu os 10 capítulos |
 | Infiltrador | 70 | 10 / 10 | 3h 35m | 37 | concluiu os 10 capítulos |
 | Mercador | 53 | 10 / 10 | 2h 50m | 32 | concluiu os 10 capítulos |
-| Acólito | 63 | 10 / 10 | 5h 43m | 32 | concluiu os 10 capítulos |
+| Acólito | 55 | 10 / 10 | 2h 28m | 29 | concluiu os 10 capítulos |
 
-**Dispersão entre classes:** mais rápida = `Guerreiro` (1h 51m), mais lenta = `Acólito` (5h 43m) → **3.1×**. Um fator próximo de 1× indica classes parelhas; acima de ~2× já é candidato a ajuste.
+**Dispersão entre classes:** mais rápida = `Guerreiro` (1h 51m), mais lenta = `Infiltrador` (3h 35m) → **1.9×**. Um fator próximo de 1× indica classes parelhas; acima de ~2× já é candidato a ajuste.
 
 ### Detalhe por capítulo
 
@@ -161,16 +161,16 @@ Gerado em 2026-08-29T17:38:15.424Z · `npm run simulate` (packages/game-core)
 
 | Cap. | Região | Nv entra | Nv sai | Tempo simulado | Mortes | Kills de farm | Monstros HP-negativo | Pior dano/regen | Parede? |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 13s | 4 | 0 | 11 | 18.2× |  |
-| 2 | Esgotos de Aurelis | 3 | 10 | 6m 23s | 6 | 61 | 67 | 19.9× |  |
-| 3 | Florestas de Sylmere | 10 | 18 | 17m 48s | 6 | 121 | 127 | 17.2× |  |
-| 4 | Torre Arcana | 18 | 24 | 21m 2s | 4 | 118 | 124 | 14.4× |  |
-| 5 | Colinas de Kaeshin | 24 | 29 | 22m 36s | 2 | 124 | 129 | 11.9× |  |
-| 6 | Caverna de Kaeshin | 29 | 34 | 27m 25s | 3 | 145 | 150 | 12.3× |  |
-| 7 | Dunas de Zahkar | 34 | 43 | 59m 58s | 2 | 335 | 340 | 11.8× |  |
-| 8 | Pirâmide Esquecida | 43 | 51 | 1h 5m | 2 | 361 | 366 | 11.7× |  |
-| 9 | Costa de Ventomar | 51 | 63 | 2h | 2 | 676 | 681 | 11.9× |  |
-| 10 | Navio Naufragado | 63 | 63 | 51s | 1 | 0 | 4 | 10.8× |  |
+| 1 | Campos ao Redor de Aurelis | 1 | 3 | 1m 5s | 2 | 0 | 11 | 19.7× |  |
+| 2 | Esgotos de Aurelis | 3 | 9 | 3m 44s | 6 | 43 | 49 | 21.7× |  |
+| 3 | Florestas de Sylmere | 9 | 16 | 8m 57s | 5 | 85 | 91 | 22.1× |  |
+| 4 | Torre Arcana | 16 | 21 | 9m 17s | 4 | 76 | 82 | 19.8× |  |
+| 5 | Colinas de Kaeshin | 21 | 25 | 9m 8s | 2 | 74 | 79 | 17.3× |  |
+| 6 | Caverna de Kaeshin | 25 | 30 | 13m 37s | 3 | 111 | 116 | 18.3× |  |
+| 7 | Dunas de Zahkar | 30 | 37 | 22m 56s | 2 | 199 | 204 | 17.4× |  |
+| 8 | Pirâmide Esquecida | 37 | 45 | 31m 45s | 2 | 277 | 282 | 18.0× |  |
+| 9 | Costa de Ventomar | 45 | 55 | 47m 51s | 2 | 435 | 440 | 17.9× |  |
+| 10 | Navio Naufragado | 55 | 55 | 31s | 1 | 0 | 4 | 16.7× |  |
 
 > "Monstros HP-negativo" = monstros em que `dano recebido/s > regen de HP/s` — o personagem só sobrevive porque cura ao matar; "Pior dano/regen" é a razão mais extrema vista no capítulo. "Mortes" só acontecem quando o personagem morre ANTES de matar o monstro (HP cheio não aguenta o `ttk`).
 

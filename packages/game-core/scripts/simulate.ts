@@ -111,9 +111,11 @@ const XP_FORMULA_TEXT = "floor(50 + 25*nível + 5*nível²)  (réplica de apps/w
 
 /**
  * Builds "padrão" por linha de classe — pesos de alocação dos POINTS_PER_LEVEL
- * pontos ganhos a cada nível. Refletem a fantasia da classe (GDD §3); NÃO foram
- * calibradas para equilibrar — a diferença entre elas é justamente o que se quer
- * medir. Atributos: FOR=dano físico, AGI=aspd/esquiva, VIT=HP/regen/def,
+ * pontos ganhos a cada nível. Refletem a fantasia da classe (GDD §3).
+ * Em geral NÃO são calibradas para equilibrar; exceção: o Acólito foi ajustado
+ * para concentrar mais em dano (FOR, caminho Monge/Mestre Marcial) em vez de
+ * pulverizar entre FOR/INT/VIT — antes: FOR 0.3 / VIT 0.4 / INT 0.3.
+ * Atributos: FOR=dano físico, AGI=aspd/esquiva, VIT=HP/regen/def,
  * INT=dano mágico, DES=acerto/dano à distância, SOR=crítico.
  */
 const CLASS_BUILDS: Record<ClassLine, Record<Attribute, number>> = {
@@ -122,7 +124,7 @@ const CLASS_BUILDS: Record<ClassLine, Record<Attribute, number>> = {
   Caçador: { FOR: 0.2, AGI: 0.3, VIT: 0, INT: 0, DES: 0.5, SOR: 0 },
   Infiltrador: { FOR: 0.3, AGI: 0.35, VIT: 0, INT: 0, DES: 0, SOR: 0.35 },
   Mercador: { FOR: 0, AGI: 0, VIT: 0.4, INT: 0.4, DES: 0.2, SOR: 0 },
-  Acólito: { FOR: 0.3, AGI: 0, VIT: 0.4, INT: 0.3, DES: 0, SOR: 0 },
+  Acólito: { FOR: 0.6, AGI: 0, VIT: 0.3, INT: 0.1, DES: 0, SOR: 0 },
 };
 
 const ATTRS: readonly Attribute[] = ["FOR", "AGI", "VIT", "INT", "DES", "SOR"];
@@ -715,9 +717,9 @@ function buildReport(
     p(
       `- **Dispersão entre classes: ${disp.toFixed(1)}×** (mais rápida \`${fast[0]!.line}\` ` +
         `${fmtDuration(fast[0]!.totalSeconds)} · mais lenta \`${fast[fast.length - 1]!.line}\` ` +
-        `${fmtDuration(fast[fast.length - 1]!.totalSeconds)}). Builds concentradas em dano (FOR ou ` +
-        `DES) são as mais rápidas; builds que pulverizam pontos em VIT/INT (Acólito, Mercador) ` +
-        `demoram mais porque parte do investimento não vira dano. ` +
+        `${fmtDuration(fast[fast.length - 1]!.totalSeconds)}). Builds concentradas num stat de dano ` +
+        `(FOR ou DES) são as mais rápidas; builds que investem pesado fora de dano — Mercador em ` +
+        `VIT/INT, Infiltrador em SOR/AGI — demoram mais porque parte dos pontos não vira dano. ` +
         `${anyWall ? "Alguma classe bateu numa parede — ver Seção 1." : "Nenhuma classe travou numa parede."}`,
     );
     p(
