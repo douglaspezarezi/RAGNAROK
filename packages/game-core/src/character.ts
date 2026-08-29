@@ -198,8 +198,12 @@ export const CHARACTER_TUNING = {
   ASPD_MIN: 0.2,
   ASPD_MAX: 4.0,
 
-  /** Regen de HP base por segundo, como fração do HP máximo. */
-  HP_REGEN_FRACTION_PER_SEC: 0.002,
+  /**
+   * Regen de HP base por segundo, como fração do HP máximo.
+   * Elevado de 0.002 → 0.008 para o regen deixar de ser desprezível frente ao
+   * dano recebido (era 40–114× o regen na simulação).
+   */
+  HP_REGEN_FRACTION_PER_SEC: 0.008,
   /** Regen de SP base, plano, por segundo. */
   SP_REGEN_FLAT_PER_SEC: 0.5,
 } as const;

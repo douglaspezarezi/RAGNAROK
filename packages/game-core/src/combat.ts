@@ -235,7 +235,8 @@ function clamp(value: number, min: number, max: number): number {
 
 export const REWARD_TUNING = {
   BASE_XP: 8,
-  XP_PER_LEVEL: 6,
+  /** XP por nível do monstro. Reduzido de 6 → 3 para desacelerar a progressão. */
+  XP_PER_LEVEL: 3,
   BASE_GOLD: 5,
   GOLD_PER_LEVEL: 4,
 
