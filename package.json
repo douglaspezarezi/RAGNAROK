@@ -1,0 +1,21 @@
+{
+  "name": "ragnarok",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Idle RPG ambientado no Continente de Elyndor — monorepo",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @game/web",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:data": "npm run typecheck --workspace @game/data",
+    "typecheck:core": "npm run typecheck --workspace @game/core"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
