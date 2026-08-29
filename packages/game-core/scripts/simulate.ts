@@ -102,12 +102,13 @@ const CONFIG = {
 
 /**
  * REPLICADO de apps/web/lib/gameSave.ts (NÃO é de @game/core):
- *   xpToNextLevel(level) = floor(50 + 25*level + 5*level^2)
+ *   xpToNextLevel(level) = floor(50 + 20*level + 1.2*level^2)
  */
 function xpToNextLevel(level: number): number {
-  return Math.floor(50 + 25 * level + 5 * level * level);
+  return Math.floor(50 + 20 * level + 1.2 * level * level);
 }
-const XP_FORMULA_TEXT = "floor(50 + 25*nível + 5*nível²)  (réplica de apps/web/lib/gameSave.ts)";
+const XP_FORMULA_TEXT =
+  "floor(50 + 20*nível + 1.2*nível²)  (réplica de apps/web/lib/gameSave.ts)";
 
 /**
  * Builds "padrão" por linha de classe — pesos de alocação dos POINTS_PER_LEVEL
@@ -708,12 +709,15 @@ function buildReport(
     const anyWall = runs.some((r) => r.wallChapter !== undefined);
 
     p(
-      `- **Progressão rápida demais em relação à curva de nível.** ` +
+      `- **Nível não acompanha os capítulos.** ` +
         `${allTen ? "Todas as 6 classes" : "Nem todas as classes"} concluem os 10 capítulos em ` +
-        `**${fmtDuration(minSec)}–${fmtDuration(maxSec)}** de jogo simulado, terminando entre ` +
-        `**Nv ${minLvl} e Nv ${maxLvl}**. O critério "Nv ${CONFIG.STOP_LEVEL}" nunca é atingido: os ` +
-        `capítulos acabam muito antes, e o personagem fica bem abaixo do nível dos monstros do fim ` +
-        `(Cap. 9–10 têm monstros Nv 100–150).`,
+        `**${fmtDuration(minSec)}–${fmtDuration(maxSec)}** de jogo simulado, terminando só entre ` +
+        `**Nv ${minLvl} e Nv ${maxLvl}** — ~2,5× abaixo dos monstros do fim (Cap. 9–10 = Nv 100–150). ` +
+        `Achatar a curva de XP acelerou o clear mas **não** mudou o nível final: neste modelo o ` +
+        `personagem para de farmar assim que sobrevive ao próximo capítulo (heal ao matar + ` +
+        `\`READINESS_SAFETY = ${CONFIG.READINESS_SAFETY}\`), então o nível fica preso ao mínimo de ` +
+        `sobrevivência, não ao XP. Levers reais: \`LEVEL_UP_ATTRIBUTE_GROWTH\` (menos poder por nível ` +
+        `→ mais níveis) ou dificuldade dos monstros (\`MONSTER_TUNING\`).`,
     );
     p(
       `- **Dispersão entre classes: ${disp.toFixed(1)}×** (mais rápida \`${fast[0]!.line}\` ` +

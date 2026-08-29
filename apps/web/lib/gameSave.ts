@@ -107,9 +107,15 @@ export function createInitialSave(): GameSave {
 /*  Curva de XP / ganho por nível (placeholder — a balancear)                  */
 /* -------------------------------------------------------------------------- */
 
-/** XP necessário para sair de `level` para `level + 1`. */
+/**
+ * XP necessário para sair de `level` para `level + 1`.
+ *
+ * Achatada (termo quadrático 5 → 1.2) para o nível acompanhar a curva de
+ * dificuldade dos capítulos — antes o personagem terminava os 10 capítulos
+ * ~2,5× abaixo do nível dos monstros.
+ */
 export function xpToNextLevel(level: number): number {
-  return Math.floor(50 + 25 * level + 5 * level * level);
+  return Math.floor(50 + 20 * level + 1.2 * level * level);
 }
 
 /**
