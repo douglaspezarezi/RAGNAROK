@@ -102,6 +102,11 @@ function Banner({
       }
       setResults(r.results ?? []);
       setRevealKey((k) => k + 1);
+      for (const res of r.results ?? []) {
+        if (res.tier === "S") {
+          toast.summon(`Invocação lendária! ${itemName(res)} (Tier S)`);
+        }
+      }
     } finally {
       setBusy(false);
     }

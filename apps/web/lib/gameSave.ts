@@ -24,6 +24,12 @@ export const SAVE_VERSION = 1;
 /** Banners de invocação (chave em `summonPity`). */
 export type SummonBanner = BannerType;
 
+/** Marcos de conteúdo assíncrono, alimentam conquistas. */
+export interface SaveMilestones {
+  weeklyBossWins: number;
+  eventRewardsClaimed: number;
+}
+
 export interface GameSave {
   version: number;
   character: CharacterState;
@@ -38,7 +44,16 @@ export interface GameSave {
   summonCrystals: number;
   /** contador de pity por banner */
   summonPity: Record<SummonBanner, number>;
+  /** Total de monstros derrotados (campanha + offline). Alimenta conquistas. */
+  totalKills: number;
+  /** Marcos de features assíncronas (chefe semanal, eventos). */
+  milestones: SaveMilestones;
 }
+
+export const FRESH_MILESTONES: SaveMilestones = {
+  weeklyBossWins: 0,
+  eventRewardsClaimed: 0,
+};
 
 /** Saldo inicial de Cristal de Invocação (placeholder — sem fonte de renda ainda). */
 export const INITIAL_SUMMON_CRYSTALS = 1000;
@@ -100,6 +115,8 @@ export function createInitialSave(): GameSave {
     equippedSeals: {},
     summonCrystals: INITIAL_SUMMON_CRYSTALS,
     summonPity: { companion: 0, seal: 0 },
+    totalKills: 0,
+    milestones: { ...FRESH_MILESTONES },
   };
 }
 
@@ -246,6 +263,7 @@ export function applyKill(
       },
       sealFragments,
       companionFragments,
+      totalKills: (withXp.totalKills ?? 0) + 1,
     },
     levelsGained,
     chapterCleared,
@@ -432,7 +450,12 @@ export function applyOfflineRewards(
     );
   }
   return {
-    save: { ...withXp, sealFragments, companionFragments },
+    save: {
+      ...withXp,
+      sealFragments,
+      companionFragments,
+      totalKills: (withXp.totalKills ?? 0) + Math.max(0, summary.estimatedKills ?? 0),
+    },
     levelsGained,
   };
 }

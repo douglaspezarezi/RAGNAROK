@@ -28,6 +28,7 @@ import {
   useGameSave,
   xpToNextLevel,
 } from "@/lib/gameStore";
+import { useCombatTickMs } from "@/lib/settings";
 import {
   classGlyph,
   classPlaceholderColor,
@@ -42,7 +43,6 @@ import { CombatLog, type LogEntry } from "./CombatLog";
 import { RebirthModal } from "./RebirthModal";
 import { StatusPanel } from "./StatusPanel";
 
-const TICK_MS = 1000;
 const MAX_LOG = 40;
 const MAX_FLOATERS = 14;
 const FLOATER_LIFETIME_MS = 950;
@@ -93,6 +93,11 @@ export function Game() {
     () => pickActiveCompanion(save.companionFragments),
     [save.companionFragments],
   );
+
+  // velocidade de combate (Configurações) -> intervalo do loop
+  const tickMs = useCombatTickMs();
+  const tickSecondsRef = useRef(tickMs / 1000);
+  tickSecondsRef.current = tickMs / 1000;
 
   const [currentHp, setCurrentHp] = useState(derived.maxHp);
   const [currentSp, setCurrentSp] = useState(derived.maxSp);
@@ -164,9 +169,10 @@ export function Game() {
     const activeMonster = MONSTERS_BY_ID.get(character.currentStageId);
     if (!activeMonster) return;
 
-    const result = simulateCombatTick(derived, activeMonster, TICK_MS / 1000);
-    const regenHp = derived.hpRegenPerSec * (TICK_MS / 1000);
-    const regenSp = derived.spRegenPerSec * (TICK_MS / 1000);
+    const dt = tickSecondsRef.current;
+    const result = simulateCombatTick(derived, activeMonster, dt);
+    const regenHp = derived.hpRegenPerSec * dt;
+    const regenSp = derived.spRegenPerSec * dt;
 
     const dealt = Math.max(0, Math.round(result.damageDealt));
     const taken = Math.max(0, Math.round(result.damageTaken));
@@ -266,9 +272,9 @@ export function Game() {
   };
 
   useEffect(() => {
-    const id = setInterval(() => tickRef.current(), TICK_MS);
+    const id = setInterval(() => tickRef.current(), tickMs);
     return () => clearInterval(id);
-  }, []);
+  }, [tickMs]);
 
   if (!mounted) {
     return (

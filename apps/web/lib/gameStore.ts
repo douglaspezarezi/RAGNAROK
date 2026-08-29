@@ -48,6 +48,13 @@ import {
   touchLastSeen,
   type LoadedBundle,
 } from "./persistence";
+import {
+  clearAchievements,
+  hydrateAchievements,
+  runAchievementCheck,
+} from "./achievements";
+import { clearSettings, hydrateSettings } from "./settings";
+import { clearTutorial, hydrateTutorial } from "./tutorial";
 
 export {
   createInitialSave,
@@ -119,7 +126,7 @@ function commit(next: GameSave): void {
 /*  Ciclo de vida (chamado pelo AppShell)                                      */
 /* -------------------------------------------------------------------------- */
 
-/** Preenche o store com o save carregado do banco. */
+/** Preenche o store com o save carregado do banco (personagem + QoL). */
 export function hydrate(bundle: LoadedBundle): void {
   clientState = bundle.save;
   meta = {
@@ -128,7 +135,12 @@ export function hydrate(bundle: LoadedBundle): void {
     lastSeenAtMs: bundle.lastSeenAtMs,
   };
   dirty = false;
+  hydrateSettings(bundle.playerId, bundle.settings);
+  hydrateTutorial(bundle.playerId, bundle.tutorialCompleted);
+  hydrateAchievements(bundle.achievements, bundle.unlockedAchievementIds);
   emit();
+  // pega marcos já batidos antes desta sessão (ex.: nível/kills de logins antigos)
+  void afterAchievements();
 }
 
 export function isHydrated(): boolean {
@@ -142,6 +154,9 @@ export function clearStore(): void {
   meta = null;
   dirty = false;
   backgrounded = false;
+  clearSettings();
+  clearTutorial();
+  clearAchievements();
   emit();
 }
 
@@ -283,6 +298,7 @@ export async function checkOfflineProgress(): Promise<OfflineRewardsSummary | nu
     summary,
   );
   await saveNow();
+  void afterAchievements();
 
   return summary;
 }
@@ -300,6 +316,27 @@ export function getSave(): GameSave {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Conquistas — verificadas nos pontos que já existem (sem polling)           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Reavalia as conquistas contra o estado atual. Chamado após cada ação
+ * relevante (kill, level up, invocação, rebirth, equipar, chefe semanal,
+ * recompensa de evento). Concede recompensa e persiste se algo desbloquear.
+ */
+async function afterAchievements(): Promise<void> {
+  if (!clientState || !meta) return;
+  await runAchievementCheck({
+    playerId: meta.playerId,
+    save: clientState,
+    grantReward: (kind, id) => {
+      if (clientState) commit(applyGrantItem(clientState, kind, id));
+    },
+    persist: () => saveNow(),
+  });
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Ações (mesma assinatura de antes)                                          */
 /* -------------------------------------------------------------------------- */
 
@@ -312,6 +349,7 @@ export function recordKill(input: RecordKillInput): {
   commit(save);
   // evento importante -> salva já; kill "comum" fica para o autosave de 10s
   if (levelsGained > 0 || chapterCleared) void saveNow();
+  void afterAchievements();
   return { levelsGained, chapterCleared };
 }
 
@@ -350,6 +388,7 @@ export function equipSeal(slot: string, sealId: string): void {
   if (!clientState) return;
   commit(applyEquip(clientState, slot, sealId));
   void saveNow();
+  void afterAchievements();
 }
 
 export function unequipSlot(slot: string): void {
@@ -414,6 +453,7 @@ export async function performSummon(
     commit(prev); // rollback — o toast de erro já apareceu
     return { ok: false, error: "Falha ao salvar a invocação. Tente de novo." };
   }
+  void afterAchievements();
   return { ok: true, results };
 }
 
@@ -432,15 +472,39 @@ export async function grantExclusiveReward(
 ): Promise<boolean> {
   if (!clientState) return false;
   const prev = clientState;
-  const next = applyGrantItem(prev, kind, id);
-  if (next === prev) return true; // já possui — nada a persistir
+  const withItem = applyGrantItem(prev, kind, id);
+  // conta como "recompensa de evento resgatada" mesmo se já possuía o item
+  const next: GameSave = {
+    ...withItem,
+    milestones: {
+      ...withItem.milestones,
+      eventRewardsClaimed: withItem.milestones.eventRewardsClaimed + 1,
+    },
+  };
   commit(next);
   const saved = await persistNowChecked();
   if (!saved) {
     commit(prev);
     return false;
   }
+  void afterAchievements();
   return true;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Chefe da Semana — marco para conquistas                                    */
+/* -------------------------------------------------------------------------- */
+
+/** Registra uma vitória no Chefe da Semana (dano >= HP do chefe reforçado). */
+export function recordWeeklyBossWin(): void {
+  if (!clientState) return;
+  const m = clientState.milestones;
+  commit({
+    ...clientState,
+    milestones: { ...m, weeklyBossWins: m.weeklyBossWins + 1 },
+  });
+  void saveNow();
+  void afterAchievements();
 }
 
 /* -------------------------------------------------------------------------- */
@@ -465,5 +529,6 @@ export async function doRebirth(): Promise<{ ok: boolean; error?: string }> {
     commit(prev);
     return { ok: false, error: "Falha ao salvar o renascimento. Tente de novo." };
   }
+  void afterAchievements();
   return { ok: true };
 }

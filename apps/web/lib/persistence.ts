@@ -21,10 +21,13 @@ import {
 import { upsertLeaderboardStage } from "./leaderboard";
 import { getSupabase } from "./supabase/client";
 import type {
+  AchievementRow,
   CharacterProgress,
   CharacterRow,
+  PlayerAchievementRow,
   PlayerCompanionRow,
   PlayerSealRow,
+  PlayerSettings,
 } from "./supabase/types";
 import { toast } from "./toast";
 
@@ -37,6 +40,14 @@ export interface LoadedBundle {
   /** `last_seen_at` do banco, em epoch ms. */
   lastSeenAtMs: number;
   save: GameSave;
+  /** `players.tutorial_completed` — controla o onboarding. */
+  tutorialCompleted: boolean;
+  /** `players.settings` (som/música/velocidade). */
+  settings: Partial<PlayerSettings>;
+  /** Catálogo de conquistas. */
+  achievements: AchievementRow[];
+  /** Conquistas que o jogador já desbloqueou. */
+  unlockedAchievementIds: string[];
 }
 
 export interface SaveTarget {
@@ -53,12 +64,15 @@ function logError(context: string, error: unknown): void {
 /*  Tradução linhas <-> GameSave                                               */
 /* -------------------------------------------------------------------------- */
 
-function progressOf(row: CharacterRow): CharacterProgress {
+function progressOf(row: CharacterRow): Required<CharacterProgress> {
   const p = row.progress ?? {};
   return {
     rebirthCount: p.rebirthCount ?? 0,
     clearedChapters: p.clearedChapters ?? [],
     clearedStageIds: p.clearedStageIds ?? [],
+    totalKills: p.totalKills ?? 0,
+    weeklyBossWins: p.weeklyBossWins ?? 0,
+    eventRewardsClaimed: p.eventRewardsClaimed ?? 0,
   };
 }
 
@@ -99,15 +113,23 @@ function rowsToGameSave(
     equippedSeals,
     summonCrystals: Number(character.summon_crystals ?? INITIAL_SUMMON_CRYSTALS),
     summonPity: { companion: pity.companion ?? 0, seal: pity.seal ?? 0 },
+    totalKills: progress.totalKills,
+    milestones: {
+      weeklyBossWins: progress.weeklyBossWins,
+      eventRewardsClaimed: progress.eventRewardsClaimed,
+    },
   };
 }
 
-function progressFromSave(save: GameSave): CharacterProgress {
+function progressFromSave(save: GameSave): Required<CharacterProgress> {
   const c = save.character;
   return {
     rebirthCount: c.rebirthCount ?? 0,
     clearedChapters: c.clearedChapters ?? [],
     clearedStageIds: c.clearedStageIds ?? [],
+    totalKills: save.totalKills ?? 0,
+    weeklyBossWins: save.milestones?.weeklyBossWins ?? 0,
+    eventRewardsClaimed: save.milestones?.eventRewardsClaimed ?? 0,
   };
 }
 
@@ -195,6 +217,9 @@ async function ensureCharacter(playerId: string): Promise<string | null> {
         rebirthCount: 0,
         clearedChapters: [],
         clearedStageIds: [],
+        totalKills: 0,
+        weeklyBossWins: 0,
+        eventRewardsClaimed: 0,
       } satisfies CharacterProgress,
       equipped_seals: {},
       summon_crystals: INITIAL_SUMMON_CRYSTALS,
@@ -225,12 +250,22 @@ export async function loadBundle(
   const characterId = await ensureCharacter(playerId);
   if (!characterId) return null;
 
-  const [charRes, playerRes, companionsRes, sealsRes] = await Promise.all([
-    supabase.from("characters").select("*").eq("id", characterId).single(),
-    supabase.from("players").select("last_seen_at").eq("id", playerId).single(),
-    supabase.from("player_companions").select("*").eq("player_id", playerId),
-    supabase.from("player_seals").select("*").eq("player_id", playerId),
-  ]);
+  const [charRes, playerRes, companionsRes, sealsRes, achRes, playerAchRes] =
+    await Promise.all([
+      supabase.from("characters").select("*").eq("id", characterId).single(),
+      supabase
+        .from("players")
+        .select("last_seen_at, tutorial_completed, settings")
+        .eq("id", playerId)
+        .single(),
+      supabase.from("player_companions").select("*").eq("player_id", playerId),
+      supabase.from("player_seals").select("*").eq("player_id", playerId),
+      supabase.from("achievements").select("*"),
+      supabase
+        .from("player_achievements")
+        .select("achievement_id")
+        .eq("player_id", playerId),
+    ]);
 
   const err =
     charRes.error || playerRes.error || companionsRes.error || sealsRes.error;
@@ -239,18 +274,32 @@ export async function loadBundle(
     toast.error("Erro ao carregar seu progresso.");
     return null;
   }
+  // conquistas são secundárias — se falharem, o jogo carrega mesmo assim
+  if (achRes.error) logError("loadBundle.achievements", achRes.error);
+  if (playerAchRes.error)
+    logError("loadBundle.player_achievements", playerAchRes.error);
 
-  const lastSeen = (playerRes.data as { last_seen_at: string }).last_seen_at;
+  const player = playerRes.data as {
+    last_seen_at: string;
+    tutorial_completed: boolean;
+    settings: Partial<PlayerSettings> | null;
+  };
 
   return {
     playerId,
     characterId,
-    lastSeenAtMs: new Date(lastSeen).getTime(),
+    lastSeenAtMs: new Date(player.last_seen_at).getTime(),
     save: rowsToGameSave(
       charRes.data as CharacterRow,
       (companionsRes.data ?? []) as PlayerCompanionRow[],
       (sealsRes.data ?? []) as PlayerSealRow[],
     ),
+    tutorialCompleted: player.tutorial_completed ?? false,
+    settings: player.settings ?? {},
+    achievements: (achRes.data ?? []) as AchievementRow[],
+    unlockedAchievementIds: (
+      (playerAchRes.data ?? []) as Pick<PlayerAchievementRow, "achievement_id">[]
+    ).map((r) => r.achievement_id),
   };
 }
 
@@ -323,6 +372,52 @@ export async function saveBundle(
     toast.error("Erro de rede ao salvar progresso.");
     return false;
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Onboarding, configurações e conquistas                                     */
+/* -------------------------------------------------------------------------- */
+
+/** Marca `players.tutorial_completed = true` (concluir/pular o tutorial). */
+export async function setTutorialCompleted(playerId: string): Promise<void> {
+  const { error } = await getSupabase()
+    .from("players")
+    .update({ tutorial_completed: true })
+    .eq("id", playerId);
+  if (error) logError("setTutorialCompleted", error);
+}
+
+/** Persiste `players.settings` (som/música/velocidade de combate). */
+export async function savePlayerSettings(
+  playerId: string,
+  settings: PlayerSettings,
+): Promise<void> {
+  const { error } = await getSupabase()
+    .from("players")
+    .update({ settings })
+    .eq("id", playerId);
+  if (error) {
+    logError("savePlayerSettings", error);
+    toast.error("Não foi possível salvar as preferências.");
+  }
+}
+
+/** Registra uma conquista desbloqueada. `true` em sucesso (ou se já existia). */
+export async function insertPlayerAchievement(
+  playerId: string,
+  achievementId: string,
+): Promise<boolean> {
+  const { error } = await getSupabase()
+    .from("player_achievements")
+    .upsert(
+      { player_id: playerId, achievement_id: achievementId },
+      { onConflict: "player_id,achievement_id", ignoreDuplicates: true },
+    );
+  if (error) {
+    logError("insertPlayerAchievement", error);
+    return false;
+  }
+  return true;
 }
 
 /** Atualiza só `players.last_seen_at = now` (quando não há mudança de estado). */

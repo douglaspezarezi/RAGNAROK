@@ -10,10 +10,11 @@ Supabase real. ~10 minutos.
 
 ## 2. Rodar as migrations (cria tabelas + RLS + trigger + colunas do gacha)
 
-**Rode as três, em ordem:**
+**Rode as quatro, em ordem:**
 1. [`supabase/migrations/20260829120000_init_game_schema.sql`](supabase/migrations/20260829120000_init_game_schema.sql) — tabelas + RLS + trigger.
 2. [`supabase/migrations/20260829130000_gacha_equipment_rebirth.sql`](supabase/migrations/20260829130000_gacha_equipment_rebirth.sql) — 3 colunas novas em `characters`: `equipped_seals`, `summon_crystals`, `summon_pity`.
 3. [`supabase/migrations/20260829140000_events_and_rankings.sql`](supabase/migrations/20260829140000_events_and_rankings.sql) — Eventos Temporários + Rankings (`events`, `player_event_progress`, `leaderboard_stage`, `weekly_boss`, `weekly_boss_attempts`) + RLS. O fim do arquivo tem um bloco de **seed de teste** comentado.
+4. [`supabase/migrations/20260829150000_qol_tutorial_settings_achievements.sql`](supabase/migrations/20260829150000_qol_tutorial_settings_achievements.sql) — QoL: `players.tutorial_completed` + `players.settings`, `characters.created_at`, `achievements` (com **20 conquistas já semeadas**) + `player_achievements` + RLS.
 
 **Opção A — SQL Editor (mais rápido):**
 Dashboard → **SQL Editor** → **New query** → cole o conteúdo de cada arquivo → **Run** (uma vez cada).
@@ -179,6 +180,31 @@ Na tela **Chefe da Semana**: mostra o chefe, HP/ATQ reforçados e contador. **Te
 agora** simula 60s de combate (via `simulateCombatTick`), registra o dano em
 `weekly_boss_attempts` e atualiza o ranking (maior dano por jogador). Limite:
 **3 tentativas por dia** (contadas no cliente a partir de `attempted_at`).
+
+## 7. Onboarding, Configurações e Conquistas (migration 4)
+
+Nada de setup extra — a migration 4 já semeia as **20 conquistas** e cria as
+colunas de tutorial/preferências.
+
+- **Tutorial**: aparece automático no **primeiro login** de uma conta nova
+  (`players.tutorial_completed = false`). "Pular tutorial" ou terminar marca a
+  coluna e não volta. **Config → Rever tutorial** reabre quando quiser.
+- **Config** (`/settings`): toggles de Som/Música (persistem em
+  `players.settings`, sem áudio ainda), **Velocidade de combate** Normal/Rápido
+  (muda o intervalo do loop na tela de Combate — 1000ms / 500ms), dados da conta
+  (e-mail, data de criação do personagem) e **Sair da conta**.
+- **Conquistas** (`/achievements`): lista as 20; desbloqueadas com destaque
+  âmbar, bloqueadas em cinza com barra "X/Y" quando o critério é numérico (ex.:
+  "42/100 monstros derrotados").
+  São verificadas nos pontos que já existem (derrota de monstro, level up,
+  invocação, rebirth, equipar Selo, vitória no Chefe da Semana, recompensa de
+  evento) — sem polling. Ao desbloquear: notificação in-game + entrega da
+  recompensa (Companheiro/Selo) quando houver.
+- **Notificações**: `useNotifications()` / `toast.*` — fila de toasts no canto
+  (conquista, erro ao salvar, evento terminando, invocação Tier S).
+
+Para testar conquistas rápido: derrote ~10 monstros ("Caçador Iniciante"),
+equipe um Selo, ou rode uma tentativa vencedora no Chefe da Semana.
 
 ## Como auditar depois
 

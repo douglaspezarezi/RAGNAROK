@@ -23,6 +23,7 @@ import { getSupabase, isSupabaseConfigured } from "@/lib/supabase/client";
 import { Toaster } from "@/lib/toast";
 import { AuthScreen } from "./AuthScreen";
 import { OfflineRewardsModal } from "./OfflineRewardsModal";
+import { TutorialOverlay } from "./TutorialOverlay";
 
 type Phase = "loading" | "config" | "auth" | "ready" | "error";
 
@@ -33,6 +34,8 @@ const NAV = [
   { href: "/events", label: "Eventos" },
   { href: "/leaderboard", label: "Ranking" },
   { href: "/weekly-boss", label: "Chefe da Semana" },
+  { href: "/achievements", label: "Conquistas" },
+  { href: "/settings", label: "Config" },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -186,6 +189,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           onClose={() => setOffline(null)}
         />
       ) : null}
+      <TutorialOverlay />
       <Toaster />
     </>
   );

@@ -5,7 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { deriveMonsterStats } from "@game/core";
 
 import { Countdown } from "@/components/Countdown";
-import { getMeta, isHydrated, useGameSave } from "@/lib/gameStore";
+import {
+  getMeta,
+  isHydrated,
+  recordWeeklyBossWin,
+  useGameSave,
+} from "@/lib/gameStore";
 import { characterDisplayName } from "@/lib/leaderboard";
 import { toast } from "@/lib/toast";
 import type { WeeklyBossAttemptRow, WeeklyBossRow } from "@/lib/supabase/types";
@@ -100,6 +105,7 @@ export function WeeklyBossScreen() {
       toast.success(
         `Tentativa registrada: ${result.damage.toLocaleString("pt-BR")} de dano.`,
       );
+      if (result.wouldKill) recordWeeklyBossWin(); // marco -> conquista
       setAttempts(await fetchBossAttempts(boss.id));
     } finally {
       setBusy(false);

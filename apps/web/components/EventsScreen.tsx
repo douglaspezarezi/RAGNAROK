@@ -25,6 +25,11 @@ type Load = "loading" | "ready" | "error";
 /** A cada quantos kills o progresso é gravado no Supabase. */
 const FLUSH_EVERY_KILLS = 5;
 
+/** Avisa quando um evento termina em menos de 24h. */
+const ENDING_SOON_MS = 24 * 60 * 60 * 1000;
+/** Eventos já avisados nesta sessão (não repetir o toast a cada refresh). */
+const endingSoonNotified = new Set<string>();
+
 interface Baseline {
   eventId: string;
   kills: number;
@@ -54,6 +59,14 @@ export function EventsScreen() {
           evs.map((e) => e.id),
         ),
       );
+      const now = Date.now();
+      for (const ev of evs) {
+        const left = new Date(ev.ends_at).getTime() - now;
+        if (left > 0 && left <= ENDING_SOON_MS && !endingSoonNotified.has(ev.id)) {
+          endingSoonNotified.add(ev.id);
+          toast.event(`Evento "${ev.name}" termina em breve!`);
+        }
+      }
       setLoad("ready");
     } catch {
       setLoad("error");

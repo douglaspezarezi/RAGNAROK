@@ -12,6 +12,19 @@ export interface CharacterProgress {
   rebirthCount: number;
   clearedChapters: number[];
   clearedStageIds: string[];
+  /** Total de monstros derrotados (campanha + offline) — usado por conquistas. */
+  totalKills?: number;
+  /** Vezes que o jogador derrubou o Chefe da Semana. */
+  weeklyBossWins?: number;
+  /** Recompensas de evento resgatadas. */
+  eventRewardsClaimed?: number;
+}
+
+/** Preferências do jogador (`players.settings` jsonb). */
+export interface PlayerSettings {
+  sound: boolean;
+  music: boolean;
+  combatSpeed: "normal" | "fast";
 }
 
 /** Contador de pity por banner (`characters.summon_pity`). */
@@ -25,6 +38,8 @@ export interface PlayerRow {
   auth_user_id: string;
   created_at: string;
   last_seen_at: string;
+  tutorial_completed: boolean;
+  settings: Partial<PlayerSettings>;
 }
 
 export interface CharacterRow {
@@ -136,4 +151,38 @@ export interface WeeklyBossAttemptRow {
   character_name: string;
   damage_dealt: number;
   attempted_at: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Conquistas (migration 20260829150000)                                      */
+/* -------------------------------------------------------------------------- */
+
+export type AchievementCriteriaType =
+  | "reach_level"
+  | "total_kills"
+  | "clear_chapters"
+  | "own_companion_tier_s"
+  | "own_companions"
+  | "equip_all_seal_slots"
+  | "own_seals"
+  | "first_rebirth"
+  | "reach_rebirth"
+  | "weekly_boss_win"
+  | "claim_event_reward";
+
+export interface AchievementRow {
+  id: string;
+  name: string;
+  description: string;
+  criteria_type: AchievementCriteriaType;
+  criteria_value: number;
+  reward_type: "companion" | "seal" | null;
+  reward_id: string | null;
+  sort_order: number;
+}
+
+export interface PlayerAchievementRow {
+  player_id: string;
+  achievement_id: string;
+  unlocked_at: string;
 }
