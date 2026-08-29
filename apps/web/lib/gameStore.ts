@@ -1,115 +1,80 @@
 "use client";
 
 /**
- * Store local do personagem (protótipo, sem contas/Supabase).
+ * Store do personagem — agora com persistência no Supabase (antes: localStorage).
  *
- * - Guarda `CharacterState` (de `@game/core`) + ouro + fragmentos num único
- *   objeto `GameSave`, persistido em `localStorage` a cada mudança.
- * - Expõe `useGameSave()` (via `useSyncExternalStore`) para os componentes lerem,
- *   e ações puras-ish (`recordKill`, `advanceStage`, `resetSave`) para mutarem.
+ * A INTERFACE PÚBLICA é a mesma de antes, então os componentes da tela
+ * (`Game.tsx`, `BattleArena`, ...) não mudam:
+ *   - `useGameSave()`  — leitura reativa
+ *   - `getSave()`      — leitura imperativa (loop de combate)
+ *   - `recordKill()` / `advanceStage()` / `resetSave()`
+ *   - helpers puros reexportados de `gameSave.ts`
  *
- * A lógica de combate/recompensa NÃO vive aqui — vem de `@game/core`.
+ * A diferença é por dentro: em vez de `localStorage`, o estado é hidratado a
+ * partir do banco (via `hydrate()`, chamado pelo `AppShell` depois do login) e
+ * salvo de forma assíncrona — a cada 10s de jogo ativo e em eventos importantes
+ * (subir de nível, avançar estágio), nunca a cada tick.
  */
 
 import { useSyncExternalStore } from "react";
 
+import { MONSTERS_BY_ID } from "@game/data";
 import {
-  BASE_JOBS,
-  MONSTERS,
-  MONSTERS_BY_ID,
-  type Monster,
-} from "@game/data";
-import {
-  getMonstersByChapter,
-  type CharacterState,
-  type DefeatRewards,
+  calculateOfflineRewards,
+  type OfflineRewardsSummary,
 } from "@game/core";
 
-const STORAGE_KEY = "ragnarok:save";
-const SAVE_VERSION = 1;
+import {
+  applyAdvanceStage,
+  applyKill,
+  applyOfflineRewards,
+  createInitialSave,
+  type ApplyKillInput,
+  type GameSave,
+} from "./gameSave";
+import {
+  insertOfflineSession,
+  resetCharacter,
+  saveBundle,
+  touchLastSeen,
+  type LoadedBundle,
+} from "./persistence";
 
-export interface GameSave {
-  version: number;
-  character: CharacterState;
-  gold: number;
-  /** sealId -> quantidade de fragmentos */
-  sealFragments: Record<string, number>;
-  /** companionId -> quantidade de fragmentos */
-  companionFragments: Record<string, number>;
+export {
+  createInitialSave,
+  getStageMonsters,
+  LEVEL_UP_ATTRIBUTE_GROWTH,
+  xpToNextLevel,
+  type GameSave,
+} from "./gameSave";
+
+/** Diferença mínima (s) desde `last_seen_at` para contar como "esteve fora". */
+export const OFFLINE_MIN_SECONDS = 60;
+
+const AUTOSAVE_INTERVAL_MS = 10_000;
+
+export type RecordKillInput = ApplyKillInput;
+
+interface StoreMeta {
+  playerId: string;
+  characterId: string;
+  /** `last_seen_at` conhecido, em epoch ms. */
+  lastSeenAtMs: number;
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Estado inicial                                                             */
+/*  Estado do módulo                                                           */
 /* -------------------------------------------------------------------------- */
 
-/** Primeira classe disponível (Job 1 da primeira linha). */
-const STARTER_JOB_ID = BASE_JOBS[0]?.id ?? "recruta";
+let clientState: GameSave | null = null;
+let meta: StoreMeta | null = null;
+let dirty = false;
+let backgrounded = false;
+let autosaveTimer: ReturnType<typeof setInterval> | null = null;
+/** Serializa os saves — nunca dois em paralelo, nenhum save perdido. */
+let saveChain: Promise<void> = Promise.resolve();
 
-/** Alocação inicial de atributos — simétrica, só para dar jogabilidade ao nível 1. */
-const STARTER_ATTRIBUTES = {
-  FOR: 8,
-  AGI: 8,
-  VIT: 8,
-  INT: 8,
-  DES: 8,
-  SOR: 8,
-} as const;
-
-/** Primeiro estágio = primeiro monstro comum do Capítulo 1. */
-function firstStageId(): string {
-  return getStageMonsters(1)[0]?.id ?? MONSTERS[0].id;
-}
-
-export function createInitialSave(): GameSave {
-  return {
-    version: SAVE_VERSION,
-    character: {
-      level: 1,
-      jobId: STARTER_JOB_ID,
-      baseAttributes: { ...STARTER_ATTRIBUTES },
-      equippedSeals: [],
-      currentStageId: firstStageId(),
-      xp: 0,
-      rebirthCount: 0,
-      clearedChapters: [],
-      clearedStageIds: [],
-    },
-    gold: 0,
-    sealFragments: {},
-    companionFragments: {},
-  };
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Curva de XP (placeholder — a balancear)                                    */
-/* -------------------------------------------------------------------------- */
-
-/** XP necessário para sair de `level` para `level + 1`. */
-export function xpToNextLevel(level: number): number {
-  return Math.floor(50 + 25 * level + 5 * level * level);
-}
-
-/**
- * Ganho automático de atributos por nível (placeholder do protótipo).
- *
- * O jogo final terá alocação manual de pontos; enquanto isso não existe, cada
- * nível concede +N em todos os atributos, para o personagem acompanhar a curva
- * de dificuldade dos monstros e o loop não travar.
- */
-export const LEVEL_UP_ATTRIBUTE_GROWTH = 5;
-
-/**
- * Monstros "de farm" de um capítulo: os comuns, sem os chefes (Mini/MVP).
- * As lutas de chefe terão UI própria depois; por ora ficam fora da rotação e o
- * capítulo é considerado "limpo" quando o último monstro comum cai.
- */
-export function getStageMonsters(chapterNumber: number): Monster[] {
-  return getMonstersByChapter(chapterNumber).filter((m) => !m.isBoss);
-}
-
-/* -------------------------------------------------------------------------- */
-/*  Store (external store para useSyncExternalStore)                           */
-/* -------------------------------------------------------------------------- */
+const listeners = new Set<() => void>();
 
 let SERVER_SNAPSHOT: GameSave | null = null;
 function getServerSnapshot(): GameSave {
@@ -117,51 +82,12 @@ function getServerSnapshot(): GameSave {
   return SERVER_SNAPSHOT;
 }
 
-let clientState: GameSave | null = null;
-const listeners = new Set<() => void>();
-
-function isValidSave(value: unknown): value is GameSave {
-  if (typeof value !== "object" || value === null) return false;
-  const v = value as Partial<GameSave>;
-  return (
-    v.version === SAVE_VERSION &&
-    typeof v.character === "object" &&
-    v.character !== null &&
-    typeof v.character.currentStageId === "string"
-  );
-}
-
-function loadFromStorage(): GameSave | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return isValidSave(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function persist(): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(clientState));
-  } catch {
-    /* quota cheia / modo privado — ignora, o jogo segue em memória */
-  }
-}
-
 function getSnapshot(): GameSave {
-  if (typeof window === "undefined") return getServerSnapshot();
-  if (clientState === null) {
-    clientState = loadFromStorage() ?? createInitialSave();
-  }
-  return clientState;
+  return clientState ?? getServerSnapshot();
 }
 
-function commit(next: GameSave): void {
-  clientState = next;
-  persist();
-  for (const listener of listeners) listener();
+function emit(): void {
+  for (const l of listeners) l();
 }
 
 function subscribe(listener: () => void): () => void {
@@ -171,151 +97,208 @@ function subscribe(listener: () => void): () => void {
   };
 }
 
-/** Hook de leitura reativa do save. */
+function commit(next: GameSave): void {
+  clientState = next;
+  dirty = true;
+  emit();
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Ciclo de vida (chamado pelo AppShell)                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Preenche o store com o save carregado do banco. */
+export function hydrate(bundle: LoadedBundle): void {
+  clientState = bundle.save;
+  meta = {
+    playerId: bundle.playerId,
+    characterId: bundle.characterId,
+    lastSeenAtMs: bundle.lastSeenAtMs,
+  };
+  dirty = false;
+  emit();
+}
+
+export function isHydrated(): boolean {
+  return clientState !== null && meta !== null;
+}
+
+/** Limpa tudo (logout). */
+export function clearStore(): void {
+  stopAutosave();
+  clientState = null;
+  meta = null;
+  dirty = false;
+  backgrounded = false;
+  emit();
+}
+
+export function getMeta(): StoreMeta | null {
+  return meta ? { ...meta } : null;
+}
+
+/** Pausa/religa o autosave enquanto a aba está em segundo plano. */
+export function setBackgrounded(value: boolean): void {
+  backgrounded = value;
+}
+
+export function startAutosave(): void {
+  if (autosaveTimer !== null) return;
+  autosaveTimer = setInterval(() => {
+    if (backgrounded || !dirty) return;
+    void saveNow();
+  }, AUTOSAVE_INTERVAL_MS);
+}
+
+export function stopAutosave(): void {
+  if (autosaveTimer !== null) {
+    clearInterval(autosaveTimer);
+    autosaveTimer = null;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Save                                                                       */
+/* -------------------------------------------------------------------------- */
+
+async function doSave(): Promise<void> {
+  if (!clientState || !meta) return;
+
+  if (!dirty) {
+    // nada mudou -> só marca presença
+    await touchLastSeen(meta.playerId);
+    meta.lastSeenAtMs = Date.now();
+    return;
+  }
+
+  const snapshot = clientState;
+  const ok = await saveBundle(
+    { playerId: meta.playerId, characterId: meta.characterId },
+    snapshot,
+  );
+  if (ok) {
+    meta.lastSeenAtMs = Date.now();
+    if (clientState === snapshot) dirty = false; // nada mudou durante o save
+  }
+  // em falha, `dirty` continua true e o próximo save tenta de novo
+}
+
+/**
+ * Enfileira um save do estado atual. Chamadas concorrentes são serializadas na
+ * mesma cadeia; o promise devolvido resolve quando o save correspondente termina.
+ * Sem-op se nada mudou (`dirty === false`) ou se não hidratado.
+ */
+export function saveNow(): Promise<void> {
+  saveChain = saveChain.catch(() => {}).then(doSave);
+  return saveChain;
+}
+
+/** Aguarda todos os saves enfileirados terminarem. */
+export function flushSaves(): Promise<void> {
+  return saveChain.catch(() => {});
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Progresso offline                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Compara `Date.now()` com o `last_seen_at` conhecido. Se passou do limite,
+ * calcula as recompensas offline (`@game/core`), aplica ao personagem, registra
+ * em `offline_sessions`, persiste, e devolve o resumo para a UI mostrar o modal.
+ * Retorna `null` quando não há nada relevante a creditar.
+ */
+export async function checkOfflineProgress(): Promise<OfflineRewardsSummary | null> {
+  if (!clientState || !meta) return null;
+
+  const startedAtMs = meta.lastSeenAtMs;
+  const elapsedSeconds = (Date.now() - startedAtMs) / 1000;
+  if (elapsedSeconds < OFFLINE_MIN_SECONDS) {
+    void saveNow(); // mantém o last_seen fresco
+    return null;
+  }
+
+  const summary = calculateOfflineRewards(
+    clientState.character,
+    clientState.character.currentStageId,
+    elapsedSeconds,
+  );
+
+  const nothing =
+    summary.xp <= 0 &&
+    summary.gold <= 0 &&
+    !summary.sealFragments &&
+    !summary.companionFragments;
+  if (nothing) {
+    void saveNow();
+    return null;
+  }
+
+  const { save } = applyOfflineRewards(clientState, summary);
+  commit(save);
+
+  await insertOfflineSession(
+    meta.characterId,
+    startedAtMs,
+    Date.now(),
+    summary,
+  );
+  await saveNow();
+
+  return summary;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Hooks / leitura                                                            */
+/* -------------------------------------------------------------------------- */
+
 export function useGameSave(): GameSave {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
 
-/** Leitura imperativa (para usar dentro do loop de combate). */
 export function getSave(): GameSave {
   return getSnapshot();
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Ações                                                                      */
+/*  Ações (mesma assinatura de antes)                                          */
 /* -------------------------------------------------------------------------- */
 
-/** Apaga o progresso salvo e recomeça do zero. */
-export function resetSave(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch {
-    /* ignora */
-  }
-  commit(createInitialSave());
-}
-
-export interface RecordKillInput {
-  monster: Monster;
-  rewards: DefeatRewards;
-  /** resultado do sorteio de drop de fragmento de Selo (feito pelo chamador). */
-  sealDropped: boolean;
-  /** resultado do sorteio de drop de fragmento de Companheiro. */
-  companionDropped: boolean;
-}
-
-/**
- * Aplica XP/ouro/loot de um monstro derrotado, sobe de nível se necessário,
- * marca o estágio/capítulo como limpo e avança para o próximo monstro do
- * capítulo (voltando ao início do capítulo quando o último cai).
- */
 export function recordKill(input: RecordKillInput): {
   levelsGained: number;
   chapterCleared: boolean;
 } {
-  const { monster, rewards, sealDropped, companionDropped } = input;
-  const prev = getSnapshot();
-  const char = prev.character;
-
-  // --- XP e nível ---
-  let level = char.level;
-  let xp = (char.xp ?? 0) + rewards.xp;
-  let levelsGained = 0;
-  while (xp >= xpToNextLevel(level)) {
-    xp -= xpToNextLevel(level);
-    level += 1;
-    levelsGained += 1;
-  }
-
-  // ganho automático de atributos por nível (placeholder — ver constante)
-  let baseAttributes = char.baseAttributes;
-  if (levelsGained > 0) {
-    const growth = LEVEL_UP_ATTRIBUTE_GROWTH * levelsGained;
-    baseAttributes = {
-      FOR: char.baseAttributes.FOR + growth,
-      AGI: char.baseAttributes.AGI + growth,
-      VIT: char.baseAttributes.VIT + growth,
-      INT: char.baseAttributes.INT + growth,
-      DES: char.baseAttributes.DES + growth,
-      SOR: char.baseAttributes.SOR + growth,
-    };
-  }
-
-  // --- fragmentos ---
-  const sealFragments = { ...prev.sealFragments };
-  if (sealDropped && rewards.sealFragment) {
-    const id = rewards.sealFragment.sealId;
-    sealFragments[id] = (sealFragments[id] ?? 0) + 1;
-  }
-  const companionFragments = { ...prev.companionFragments };
-  if (companionDropped && rewards.companionFragment) {
-    const id = rewards.companionFragment.companionId;
-    companionFragments[id] = (companionFragments[id] ?? 0) + 1;
-  }
-
-  // --- progresso de estágio ---
-  const clearedStageIds = (char.clearedStageIds ?? []).includes(monster.id)
-    ? char.clearedStageIds ?? []
-    : [...(char.clearedStageIds ?? []), monster.id];
-
-  const chapterMonsters = getStageMonsters(monster.chapterNumber);
-  const idx = chapterMonsters.findIndex((m) => m.id === monster.id);
-  const nextMonster = idx >= 0 ? chapterMonsters[idx + 1] : undefined;
-
-  let clearedChapters = char.clearedChapters ?? [];
-  let currentStageId: string;
-  let chapterCleared = false;
-  if (nextMonster) {
-    currentStageId = nextMonster.id;
-  } else {
-    // último monstro do capítulo caiu -> capítulo limpo, recomeça o farm do capítulo
-    if (!clearedChapters.includes(monster.chapterNumber)) {
-      clearedChapters = [...clearedChapters, monster.chapterNumber];
-      chapterCleared = true;
-    }
-    currentStageId = chapterMonsters[0]?.id ?? monster.id;
-  }
-
-  commit({
-    ...prev,
-    character: {
-      ...char,
-      level,
-      xp,
-      baseAttributes,
-      currentStageId,
-      clearedStageIds,
-      clearedChapters,
-    },
-    gold: prev.gold + rewards.gold,
-    sealFragments,
-    companionFragments,
-  });
-
+  if (!clientState) return { levelsGained: 0, chapterCleared: false };
+  const { save, levelsGained, chapterCleared } = applyKill(clientState, input);
+  commit(save);
+  // evento importante -> salva já; kill "comum" fica para o autosave de 10s
+  if (levelsGained > 0 || chapterCleared) void saveNow();
   return { levelsGained, chapterCleared };
 }
 
-/**
- * Avança para o primeiro monstro do próximo capítulo.
- * Só funciona se o capítulo atual já estiver marcado como limpo e existir um
- * próximo capítulo no bestiário.
- */
 export function advanceStage(): { ok: boolean; toChapter?: number } {
-  const prev = getSnapshot();
-  const char = prev.character;
-  const current = MONSTERS_BY_ID.get(char.currentStageId);
+  if (!clientState) return { ok: false };
+  const current = MONSTERS_BY_ID.get(clientState.character.currentStageId);
   if (!current) return { ok: false };
+  const { save, ok, toChapter } = applyAdvanceStage(
+    clientState,
+    current.chapterNumber,
+  );
+  if (ok) {
+    commit(save);
+    void saveNow();
+  }
+  return { ok, toChapter };
+}
 
-  const chapter = current.chapterNumber;
-  if (!(char.clearedChapters ?? []).includes(chapter)) return { ok: false };
-
-  const nextMonsters = getStageMonsters(chapter + 1);
-  const first = nextMonsters[0];
-  if (!first) return { ok: false };
-
-  commit({
-    ...prev,
-    character: { ...char, currentStageId: first.id },
+/** Reinicia o personagem no banco e no store. */
+export async function resetSave(): Promise<void> {
+  if (!meta) return;
+  commit(createInitialSave());
+  await resetCharacter({
+    playerId: meta.playerId,
+    characterId: meta.characterId,
   });
-  return { ok: true, toChapter: chapter + 1 };
+  meta.lastSeenAtMs = Date.now();
+  dirty = false;
 }

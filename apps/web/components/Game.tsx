@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { CHAPTERS, JOBS_BY_ID, MONSTERS_BY_ID } from "@game/data";
 import {
@@ -38,7 +38,7 @@ function chapterName(chapterNumber: number): string {
   );
 }
 
-export function Game() {
+export function Game({ accountBar }: { accountBar?: ReactNode } = {}) {
   const [mounted, setMounted] = useState(false);
   const save = useGameSave();
   const character = save.character;
@@ -108,7 +108,8 @@ export function Game() {
   // ---- loop de combate ----------------------------------------------------
   const tickRef = useRef<() => void>(() => {});
   tickRef.current = () => {
-    if (paused) return;
+    // aba em segundo plano -> o tempo vira "progresso offline" ao voltar
+    if (paused || document.hidden) return;
 
     const activeMonster = MONSTERS_BY_ID.get(character.currentStageId);
     if (!activeMonster) return;
@@ -234,13 +235,16 @@ export function Game() {
           RAGNAROK{" "}
           <span className="font-normal text-neutral-400">— protótipo</span>
         </h1>
-        <button
-          type="button"
-          onClick={() => setPaused((p) => !p)}
-          className="rounded border border-neutral-300 px-3 py-1 text-sm dark:border-neutral-700"
-        >
-          {paused ? "▶ Continuar" : "⏸ Pausar"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            className="rounded border border-neutral-300 px-3 py-1 text-sm dark:border-neutral-700"
+          >
+            {paused ? "▶ Continuar" : "⏸ Pausar"}
+          </button>
+          {accountBar}
+        </div>
       </header>
 
       <BattleArena
@@ -298,8 +302,7 @@ export function Game() {
         <button
           type="button"
           onClick={() => {
-            resetSave();
-            window.location.reload();
+            void resetSave().finally(() => window.location.reload());
           }}
           className="text-[10px] text-neutral-300 hover:text-red-500 dark:text-neutral-700"
         >

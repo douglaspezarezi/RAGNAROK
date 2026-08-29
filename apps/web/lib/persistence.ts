@@ -1,0 +1,408 @@
+"use client";
+
+/**
+ * Camada de persistência Supabase: traduz entre linhas do banco e `GameSave`,
+ * e faz as operações assíncronas (carregar, salvar, registrar sessão offline).
+ *
+ * O cliente Supabase é usado sem tipagem gerada; as linhas são moldadas aqui
+ * pelos tipos de `supabase/types.ts`. Qualquer erro de rede/Supabase vira
+ * `toast.error` — o jogador nunca perde progresso em silêncio.
+ */
+
+import type { OfflineRewardsSummary } from "@game/core";
+
+import { createInitialCharacter, type GameSave, SAVE_VERSION } from "./gameSave";
+import { getSupabase } from "./supabase/client";
+import type {
+  CharacterProgress,
+  CharacterRow,
+  PlayerCompanionRow,
+  PlayerSealRow,
+} from "./supabase/types";
+import { toast } from "./toast";
+
+/** Metadados necessários para salvar depois. */
+export interface LoadedBundle {
+  playerId: string;
+  characterId: string;
+  /** `last_seen_at` do banco, em epoch ms. */
+  lastSeenAtMs: number;
+  save: GameSave;
+}
+
+export interface SaveTarget {
+  playerId: string;
+  characterId: string;
+}
+
+function logError(context: string, error: unknown): void {
+  // eslint-disable-next-line no-console
+  console.error(`[persistence] ${context}:`, error);
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Tradução linhas <-> GameSave                                               */
+/* -------------------------------------------------------------------------- */
+
+function progressOf(row: CharacterRow): CharacterProgress {
+  const p = row.progress ?? {};
+  return {
+    rebirthCount: p.rebirthCount ?? 0,
+    clearedChapters: p.clearedChapters ?? [],
+    clearedStageIds: p.clearedStageIds ?? [],
+    equippedSeals: p.equippedSeals ?? [],
+  };
+}
+
+function rowsToGameSave(
+  character: CharacterRow,
+  companions: PlayerCompanionRow[],
+  seals: PlayerSealRow[],
+): GameSave {
+  const progress = progressOf(character);
+  const base = character.base_attributes ?? {};
+  return {
+    version: SAVE_VERSION,
+    character: {
+      level: character.level,
+      jobId: character.job_id,
+      xp: character.xp,
+      baseAttributes: {
+        FOR: base.FOR ?? 0,
+        AGI: base.AGI ?? 0,
+        VIT: base.VIT ?? 0,
+        INT: base.INT ?? 0,
+        DES: base.DES ?? 0,
+        SOR: base.SOR ?? 0,
+      },
+      currentStageId: character.current_stage_id,
+      equippedSeals: progress.equippedSeals,
+      rebirthCount: progress.rebirthCount,
+      clearedChapters: progress.clearedChapters,
+      clearedStageIds: progress.clearedStageIds,
+    },
+    gold: Number(character.gold ?? 0),
+    sealFragments: Object.fromEntries(seals.map((s) => [s.seal_id, s.fragments])),
+    companionFragments: Object.fromEntries(
+      companions.map((c) => [c.companion_id, c.fragments]),
+    ),
+  };
+}
+
+function progressFromSave(save: GameSave): CharacterProgress {
+  const c = save.character;
+  return {
+    rebirthCount: c.rebirthCount ?? 0,
+    clearedChapters: c.clearedChapters ?? [],
+    clearedStageIds: c.clearedStageIds ?? [],
+    equippedSeals: c.equippedSeals ?? [],
+  };
+}
+
+/** Colunas de `characters` a partir do `GameSave`. */
+function characterColumnsFromSave(save: GameSave): Record<string, unknown> {
+  const c = save.character;
+  return {
+    job_id: c.jobId,
+    level: c.level,
+    xp: c.xp ?? 0,
+    gold: save.gold,
+    current_stage_id: c.currentStageId,
+    base_attributes: c.baseAttributes,
+    progress: progressFromSave(save),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Onboarding: garante player + character                                     */
+/* -------------------------------------------------------------------------- */
+
+async function ensurePlayer(authUserId: string): Promise<string | null> {
+  const supabase = getSupabase();
+
+  const existing = await supabase
+    .from("players")
+    .select("id")
+    .eq("auth_user_id", authUserId)
+    .maybeSingle();
+
+  if (existing.error) {
+    logError("ensurePlayer.select", existing.error);
+    toast.error("Erro ao carregar seu perfil.");
+    return null;
+  }
+  if (existing.data) return (existing.data as { id: string }).id;
+
+  // fallback caso o trigger on_auth_user_created não esteja instalado
+  const inserted = await supabase
+    .from("players")
+    .insert({ auth_user_id: authUserId })
+    .select("id")
+    .single();
+
+  if (inserted.error) {
+    logError("ensurePlayer.insert", inserted.error);
+    toast.error("Erro ao criar seu perfil.");
+    return null;
+  }
+  return (inserted.data as { id: string }).id;
+}
+
+async function ensureCharacter(playerId: string): Promise<string | null> {
+  const supabase = getSupabase();
+
+  const existing = await supabase
+    .from("characters")
+    .select("id")
+    .eq("player_id", playerId)
+    .maybeSingle();
+
+  if (existing.error) {
+    logError("ensureCharacter.select", existing.error);
+    toast.error("Erro ao carregar seu personagem.");
+    return null;
+  }
+  if (existing.data) return (existing.data as { id: string }).id;
+
+  const initial = createInitialCharacter();
+  const inserted = await supabase
+    .from("characters")
+    .insert({
+      player_id: playerId,
+      job_id: initial.jobId,
+      level: initial.level,
+      xp: initial.xp ?? 0,
+      gold: 0,
+      current_stage_id: initial.currentStageId,
+      base_attributes: initial.baseAttributes,
+      progress: {
+        rebirthCount: 0,
+        clearedChapters: [],
+        clearedStageIds: [],
+        equippedSeals: [],
+      } satisfies CharacterProgress,
+    })
+    .select("id")
+    .single();
+
+  if (inserted.error) {
+    logError("ensureCharacter.insert", inserted.error);
+    toast.error("Erro ao criar seu personagem.");
+    return null;
+  }
+  return (inserted.data as { id: string }).id;
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Load                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export async function loadBundle(
+  authUserId: string,
+): Promise<LoadedBundle | null> {
+  const supabase = getSupabase();
+
+  const playerId = await ensurePlayer(authUserId);
+  if (!playerId) return null;
+  const characterId = await ensureCharacter(playerId);
+  if (!characterId) return null;
+
+  const [charRes, playerRes, companionsRes, sealsRes] = await Promise.all([
+    supabase.from("characters").select("*").eq("id", characterId).single(),
+    supabase.from("players").select("last_seen_at").eq("id", playerId).single(),
+    supabase.from("player_companions").select("*").eq("player_id", playerId),
+    supabase.from("player_seals").select("*").eq("player_id", playerId),
+  ]);
+
+  const err =
+    charRes.error || playerRes.error || companionsRes.error || sealsRes.error;
+  if (err) {
+    logError("loadBundle", err);
+    toast.error("Erro ao carregar seu progresso.");
+    return null;
+  }
+
+  const lastSeen = (playerRes.data as { last_seen_at: string }).last_seen_at;
+
+  return {
+    playerId,
+    characterId,
+    lastSeenAtMs: new Date(lastSeen).getTime(),
+    save: rowsToGameSave(
+      charRes.data as CharacterRow,
+      (companionsRes.data ?? []) as PlayerCompanionRow[],
+      (sealsRes.data ?? []) as PlayerSealRow[],
+    ),
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Save                                                                       */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Persiste o `GameSave` inteiro: `characters` + upsert de fragmentos de
+ * Selos/Companheiros + `players.last_seen_at`. Retorna `true` em sucesso.
+ */
+export async function saveBundle(
+  target: SaveTarget,
+  save: GameSave,
+): Promise<boolean> {
+  const supabase = getSupabase();
+  const nowIso = new Date().toISOString();
+
+  const sealRows = Object.entries(save.sealFragments)
+    .filter(([, amount]) => amount > 0)
+    .map(([seal_id, fragments]) => ({
+      player_id: target.playerId,
+      seal_id,
+      fragments,
+    }));
+  const companionRows = Object.entries(save.companionFragments)
+    .filter(([, amount]) => amount > 0)
+    .map(([companion_id, fragments]) => ({
+      player_id: target.playerId,
+      companion_id,
+      fragments,
+    }));
+
+  try {
+    const results = await Promise.all([
+      supabase
+        .from("characters")
+        .update(characterColumnsFromSave(save))
+        .eq("id", target.characterId),
+      supabase
+        .from("players")
+        .update({ last_seen_at: nowIso })
+        .eq("id", target.playerId),
+      sealRows.length > 0
+        ? supabase
+            .from("player_seals")
+            .upsert(sealRows, { onConflict: "player_id,seal_id" })
+        : Promise.resolve({ error: null }),
+      companionRows.length > 0
+        ? supabase
+            .from("player_companions")
+            .upsert(companionRows, { onConflict: "player_id,companion_id" })
+        : Promise.resolve({ error: null }),
+    ]);
+
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
+      logError("saveBundle", failed.error);
+      toast.error("Erro ao salvar progresso. Tentando de novo em breve.");
+      return false;
+    }
+    return true;
+  } catch (e) {
+    logError("saveBundle.throw", e);
+    toast.error("Erro de rede ao salvar progresso.");
+    return false;
+  }
+}
+
+/** Atualiza só `players.last_seen_at = now` (quando não há mudança de estado). */
+export async function touchLastSeen(playerId: string): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase
+    .from("players")
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq("id", playerId);
+  if (error) logError("touchLastSeen", error);
+}
+
+/** Registra uma sessão offline para auditoria futura. */
+export async function insertOfflineSession(
+  characterId: string,
+  startedAtMs: number,
+  endedAtMs: number,
+  summary: OfflineRewardsSummary,
+): Promise<void> {
+  const supabase = getSupabase();
+  const { error } = await supabase.from("offline_sessions").insert({
+    character_id: characterId,
+    started_at: new Date(startedAtMs).toISOString(),
+    ended_at: new Date(endedAtMs).toISOString(),
+    rewards_summary: summary,
+  });
+  if (error) {
+    logError("insertOfflineSession", error);
+    toast.error("Progresso offline aplicado, mas não registrado no histórico.");
+  }
+}
+
+/** Best-effort `last_seen_at = now` ao esconder/fechar a aba (com keepalive). */
+export function touchLastSeenBeacon(playerId: string): void {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anon) return;
+  try {
+    void getSupabase()
+      .auth.getSession()
+      .then(({ data }) => {
+        const token = data.session?.access_token;
+        if (!token) return;
+        void fetch(`${url}/rest/v1/players?id=eq.${playerId}`, {
+          method: "PATCH",
+          keepalive: true,
+          headers: {
+            apikey: anon,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({ last_seen_at: new Date().toISOString() }),
+        }).catch(() => {});
+      });
+  } catch {
+    /* best effort */
+  }
+}
+
+/** Reseta o personagem para o estado inicial e apaga fragmentos. */
+export async function resetCharacter(target: SaveTarget): Promise<boolean> {
+  const supabase = getSupabase();
+  const initial = createInitialCharacter();
+
+  try {
+    const results = await Promise.all([
+      supabase
+        .from("characters")
+        .update({
+          job_id: initial.jobId,
+          level: initial.level,
+          xp: initial.xp ?? 0,
+          gold: 0,
+          current_stage_id: initial.currentStageId,
+          base_attributes: initial.baseAttributes,
+          progress: {
+            rebirthCount: 0,
+            clearedChapters: [],
+            clearedStageIds: [],
+            equippedSeals: [],
+          } satisfies CharacterProgress,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", target.characterId),
+      supabase.from("player_seals").delete().eq("player_id", target.playerId),
+      supabase
+        .from("player_companions")
+        .delete()
+        .eq("player_id", target.playerId),
+    ]);
+
+    const failed = results.find((r) => r.error);
+    if (failed?.error) {
+      logError("resetCharacter", failed.error);
+      toast.error("Erro ao reiniciar o personagem.");
+      return false;
+    }
+    return true;
+  } catch (e) {
+    logError("resetCharacter.throw", e);
+    toast.error("Erro de rede ao reiniciar o personagem.");
+    return false;
+  }
+}
