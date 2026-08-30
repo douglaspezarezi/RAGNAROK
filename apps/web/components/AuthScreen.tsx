@@ -27,13 +27,32 @@ export function AuthScreen() {
           toast.error(error.message);
           return;
         }
-        // Se a confirmação de e-mail estiver ligada, não há sessão ainda.
-        if (!data.session) {
-          setNotice(
-            "Conta criada. Confira seu e-mail para confirmar o cadastro e depois entre.",
-          );
-          setMode("signin");
+
+        // Caminho feliz: confirmação de e-mail desligada -> já vem sessão.
+        // O onAuthStateChange do AppShell assume e entra no jogo.
+        if (data.session) {
+          toast.success("Conta criada! Entrando…");
+          return;
         }
+
+        // Sem sessão no signUp: tenta logar na hora com as mesmas credenciais
+        // (funciona quando "Confirm email" está desligado no projeto Supabase).
+        const signIn = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signIn.data.session) {
+          toast.success("Conta criada! Entrando…");
+          return;
+        }
+
+        // Ainda sem sessão -> o projeto Supabase está exigindo confirmação.
+        setNotice(
+          'Conta criada, mas o projeto Supabase está com "Confirm email" ligado. ' +
+            "Para entrar direto no jogo sem confirmação, desligue em " +
+            "Authentication → Providers → Email no painel do Supabase e cadastre-se de novo.",
+        );
+        setMode("signin");
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -102,8 +121,13 @@ export function AuthScreen() {
             ? "Aguarde…"
             : mode === "signin"
               ? "Entrar"
-              : "Criar conta"}
+              : "Criar conta e entrar"}
         </button>
+        {mode === "signup" ? (
+          <p className="text-center text-[11px] text-neutral-400">
+            Sem confirmação por e-mail — você entra no jogo na hora.
+          </p>
+        ) : null}
       </form>
 
       {notice ? (
